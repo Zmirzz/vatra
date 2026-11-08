@@ -68,7 +68,7 @@ const ro: HubCopy = {
   schedule: "Programate", calendar: "Calendar", email: "Email", research: "Cercetare", compare: "Compară",
   loading: "Se încarcă…", retry: "Încearcă din nou", cancel: "Anulează", save: "Salvează", delete: "Șterge", edit: "Editează", close: "Închide",
   loadError: "Nu s-a putut încărca.", saveError: "Nu s-a putut salva.", none: "Niciunul", back: "Înapoi",
-  needAccount: "Conectează-ți emailul în Setări ca să-ți citești și sorteze poșta și să scrii răspunsuri cu un asistent. Nu se trimite nimic până nu confirmi fiecare mesaj.", openSettings: "Deschide setările conturilor",
+  needAccount: "Conectează-ți emailul în Setări, ca un asistent să te ajute să-ți citești și să-ți sortezi poșta și să scrii răspunsuri. Nu se trimite nimic până nu confirmi fiecare mesaj.", openSettings: "Deschide setările conturilor",
   scheduleTitle: "Sarcini programate", scheduleEmpty: "Nimic programat încă", scheduleEmptyHelp: "Cere unui agent să facă ceva la o oră stabilită, de exemplu un rezumat dimineața. Fiecare rulare își deschide propria conversație.",
   newTask: "Sarcină programată nouă", taskName: "Nume", taskPrompt: "Ce trebuie să facă agentul?", taskAgent: "Agent", taskProject: "Proiect",
   noProject: "Fără proiect", repeat: "Repetare", once: "O singură dată", every: "La câteva minute", daily: "În fiecare zi", weekly: "În zilele alese",
