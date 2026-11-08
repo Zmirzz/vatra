@@ -1,0 +1,59 @@
+# Copy this file to vatra.toml. API keys belong in environment variables, not here.
+
+# The model agent that writes handoff summaries.
+summarizer = "local"
+
+# llama.cpp: llama serve -hf <model> --port 8080
+[agents.local]
+kind = "model"
+base_url = "http://127.0.0.1:8080/v1"
+model = "local"
+# driver = "openai"        # "openai" (the default) or "anthropic"
+# context_window = 32768   # set it when the server doesn't report its window
+
+# Any OpenAI-compatible API.
+[agents.api]
+kind = "model"
+base_url = "https://api.example.com/v1"
+model = "model-name"
+api_key_env = "VATRA_API_KEY"
+
+# The official Claude Code binary, installed and signed in by you.
+[agents.claude]
+kind = "claude"
+binary = "claude"
+
+# Optional ACP v1 agent installed and authenticated separately. See docs/acp.md.
+# Use an actual executable on Windows; for npm packages, use node.exe plus its JS entry point.
+# Vatra passes approved skills and connected tools to ACP agents.
+# [agents.external]
+# kind = "acp"
+# binary = 'C:\Program Files\nodejs\node.exe'
+# args = ['C:\path\to\installed-agent\entry.js', '--acp']
+# startup_timeout_sec = 30
+# turn_timeout_sec = 900
+
+# Codex through ACP, using Vatra's own official Sign in with ChatGPT connection.
+# Install the ACP adapter separately; use its real JS entry point and the official Codex executable.
+# Then open Settings > ChatGPT account > Continue with ChatGPT in Vatra.
+# [agents.codex]
+# kind = "acp"
+# binary = 'C:\Program Files\nodejs\node.exe'
+# args = ['C:\tools\codex-acp\dist\index.js']
+# subscription = true
+# chatgpt_plan = true
+# codex_binary = 'C:\tools\codex.exe'
+
+# The WebSearch tool. Its key is read from the environment variable named here.
+# [web_search]
+# provider = "brave"
+# api_key_env = "BRAVE_API_KEY"
+
+# How the engine agents run.
+# [engine]
+# max_steps = 200
+
+# The same MCP server reaches every agent.
+[[mcp]]
+name = "demo"
+command = "target/debug/vatra-fixture-mcp"

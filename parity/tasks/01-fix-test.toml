@@ -1,0 +1,17 @@
+id = "01-fix-test"
+title = "Fix a failing test"
+prompt = "The test in test.js fails. Find the bug in sum.js and fix it, then run `node test.js` to confirm."
+fixture = "fix-test"
+allowed_commands = ["node test.js"]
+
+[[checks]]
+kind = "command_passes"
+command = "node test.js"
+
+[[checks]]
+kind = "file_unchanged"
+path = "test.js"
+
+[[checks]]
+kind = "tool_used"
+any_of = ["Bash", "PowerShell", "shell", "exec_command"]

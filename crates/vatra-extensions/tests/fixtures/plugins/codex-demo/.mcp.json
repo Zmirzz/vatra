@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "notes": { "command": "notes-server", "args": ["--stdio"] }
+  }
+}

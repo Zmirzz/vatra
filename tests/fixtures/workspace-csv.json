@@ -1,0 +1,8 @@
+[
+  {"name":"basic","body":"name,age\nAna,31\n","rows":[["name","age"],["Ana","31"]]},
+  {"name":"quotes_and_newlines","body":"name,note\n\"Ana, Maria\",\"one\nsecond\"\n","rows":[["name","note"],["Ana, Maria","one\nsecond"]]},
+  {"name":"unicode_and_escaped_quote","body":"oraș,text\nIași,\"un \"\"citat\"\"\"\n","rows":[["oraș","text"],["Iași","un \"citat\""]]},
+  {"name":"formulas_are_text","body":"=1+2,+3,-4,@SUM(A1)\n","rows":[["=1+2","+3","-4","@SUM(A1)"]]},
+  {"name":"bom","body":"﻿a,b\r\nx,y\r\n","rows":[["a","b"],["x","y"]]},
+  {"name":"empty","body":"","rows":[]}
+]

@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = ["apps/desktop/src-tauri", "crates/*"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+async-trait = "0.1"
+axum = { version = "0.8", features = ["ws"] }
+base64 = "0.23.1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+csv = "=1.4.0"
+clap = { version = "4.6", features = ["derive"] }
+dunce = "1.0.5"
+futures-util = "0.3"
+globset = "0.4.21"
+html2text = "0.17.4"
+ignore = "0.4.34"
+keyring = "4.2"
+libc = "0.2"
+rand = "0.10"
+ring = "0.17.14"
+regex = "1.13.1"
+reqwest = { version = "0.13", features = ["json", "form"] }
+rmcp = { version = "3.8", features = ["auth", "client", "macros", "server", "transport-child-process", "transport-io", "transport-streamable-http-client-reqwest"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10.0"
+sha2 = "0.10"
+sse-stream = "0.2"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1.54", features = ["fs", "io-util", "net", "macros", "process", "rt-multi-thread", "sync", "time"] }
+zip = "0.6"
+tokio-tungstenite = "0.30"
+tokio-rustls = "0.26"
+rustls = "0.23"
+rustls-platform-verifier = "0.7"
+toml = "0.9"
+url = "2.5"
+uuid = { version = "1.29", features = ["v4"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects"] }
+windows = { version = "=0.62.2", default-features = false, features = ["std"] }
+wiremock = "0.6"
+lopdf = { version = "0.47", default-features = false }

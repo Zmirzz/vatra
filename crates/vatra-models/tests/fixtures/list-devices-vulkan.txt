@@ -1,0 +1,2 @@
+Available devices:
+  Vulkan0: NVIDIA GeForce RTX 5060 (7895 MiB, 7127 MiB free)

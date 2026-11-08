@@ -1,0 +1,25 @@
+id = "04-skill"
+title = "Run a project skill"
+prompt = "/release-notes"
+fixture = "skill"
+skill = "release-notes"
+
+[[checks]]
+kind = "file_contains"
+path = "RELEASE_NOTES.md"
+text = "# Release notes"
+
+[[checks]]
+kind = "file_contains"
+path = "RELEASE_NOTES.md"
+text = "backoff"
+
+[[checks]]
+kind = "file_contains"
+path = "RELEASE_NOTES.md"
+text = "crash"
+
+[[checks]]
+kind = "file_contains"
+path = "RELEASE_NOTES.md"
+text = "lockfile"

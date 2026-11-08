@@ -1,0 +1,17 @@
+id = "06-multi-step"
+title = "Implement a module from its README"
+prompt = "Implement wordcount.js as described in README.md. Plan your steps first, then make the tests in test.js pass by running `node test.js`."
+fixture = "multi-step"
+allowed_commands = ["node test.js"]
+
+[[checks]]
+kind = "command_passes"
+command = "node test.js"
+
+[[checks]]
+kind = "file_unchanged"
+path = "test.js"
+
+[[checks]]
+kind = "tool_used"
+any_of = ["TodoWrite", "update_plan"]

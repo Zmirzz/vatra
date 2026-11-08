@@ -1,0 +1,61 @@
+{
+  "verifiedOn": "2026-11-03",
+  "entries": [
+    {
+      "family": "Qwen3",
+      "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+      "tasks": ["everyday", "coding"],
+      "paramsB": 4,
+      "note": "Small and quick; good tool use for its size."
+    },
+    {
+      "family": "Qwen3",
+      "repo": "unsloth/Qwen3-8B-GGUF",
+      "tasks": ["everyday", "coding"],
+      "paramsB": 8,
+      "note": "A solid all-round model at a modest size."
+    },
+    {
+      "family": "Qwen3",
+      "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+      "tasks": ["everyday", "longDocuments", "coding"],
+      "paramsB": 30,
+      "note": "Mixture of experts: fast even when part of it sits in RAM."
+    },
+    {
+      "family": "Qwen3 Coder",
+      "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+      "tasks": ["coding"],
+      "paramsB": 30,
+      "note": "Built for writing and editing code. Mixture of experts."
+    },
+    {
+      "family": "gpt-oss",
+      "repo": "unsloth/gpt-oss-20b-GGUF",
+      "tasks": ["everyday", "coding"],
+      "paramsB": 20,
+      "note": "An open model from OpenAI. Mixture of experts, so it runs quickly."
+    },
+    {
+      "family": "Gemma 3",
+      "repo": "unsloth/gemma-3-4b-it-GGUF",
+      "tasks": ["vision", "everyday"],
+      "paramsB": 4,
+      "note": "Understands images (needs the extra vision file)."
+    },
+    {
+      "family": "Gemma 3",
+      "repo": "unsloth/gemma-3-12b-it-GGUF",
+      "tasks": ["vision", "everyday", "longDocuments"],
+      "paramsB": 12,
+      "note": "Understands images and reads long documents (needs the extra vision file)."
+    },
+    {
+      "family": "Mistral Small",
+      "repo": "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+      "tasks": ["everyday", "coding", "vision"],
+      "paramsB": 24,
+      "note": "A strong general model that also understands images."
+    }
+  ]
+}

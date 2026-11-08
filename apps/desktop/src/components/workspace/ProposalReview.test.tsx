@@ -1,0 +1,12 @@
+import {expect,it} from "vitest";
+import {render,screen} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {FakeService} from "../../rpc/fake";
+import {WorkspaceClient} from "../../workspace/client";
+import {AutosaveController} from "../../workspace/autosave";
+import type {WorkspaceItem,WorkspaceProposal} from "../../workspace/types";
+import {ProposalReview} from "./ProposalReview";
+const item:WorkspaceItem={id:1,project_id:1,kind:"note",title:"Note",body:"original",fields:{},revision:1,created_at:1,updated_at:1,deleted_at:null};
+const proposal:WorkspaceProposal={id:2,project_id:1,session_id:3,target_id:1,base_revision:1,state:"pending",created_at:1,payload:{type:"edit",base_body:"original",new_body:"suggestion"}};
+it("keeps the source and draft when Apply returns a conflict",async()=>{const fake=new FakeService();fake.open();fake.failures["workspace.proposals.accept"]={code:1101,message:"workspace_conflict",data:{current:{...item,revision:2,body:"remote"}}};const controller=new AutosaveController(item,async()=>item);render(<ProposalReview proposal={proposal} controller={controller} client={new WorkspaceClient(fake.client)} onChanged={()=>{}}/>);await userEvent.click(screen.getByRole("button",{name:"Apply"}));await screen.findByText(/document changed since this suggestion/i);expect(controller.snapshot().draft.body).toBe("original");expect(fake.calls("workspace.items.save")).toHaveLength(0);});
+it("Discard does not save or throw away the person's unsaved text",async()=>{const fake=new FakeService();fake.open();fake.results["workspace.proposals.reject"]={};const controller=new AutosaveController(item,async()=>item);controller.edit({title:item.title,body:"unsaved",fields:{}});render(<ProposalReview proposal={proposal} controller={controller} client={new WorkspaceClient(fake.client)} onChanged={()=>{}}/>);await userEvent.click(screen.getByRole("button",{name:"Discard"}));expect(controller.snapshot().draft.body).toBe("unsaved");expect(fake.calls("workspace.items.save")).toHaveLength(0);controller.dispose();});

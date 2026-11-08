@@ -1,0 +1,16 @@
+id = "05-search"
+title = "Find a constant in a small project"
+prompt = "Which file defines MAX_RETRIES, and what is its value? Answer in one sentence."
+fixture = "search"
+
+[[checks]]
+kind = "answer_contains"
+text = "retry.js"
+
+[[checks]]
+kind = "answer_contains"
+text = "7"
+
+[[checks]]
+kind = "tool_used"
+any_of = ["Grep", "Glob", "Read", "Bash", "PowerShell", "shell", "exec_command"]

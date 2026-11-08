@@ -1,0 +1,1 @@
+These RSA keys were generated locally for synthetic OAuth/JWT tests. They are public test material and have never been used for an account, service, or production identity. Tests sign synthetic claims with test-key.der and verify them using test-jwks.json.

@@ -1,0 +1,48 @@
+[package]
+name = "vatra-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+base64.workspace = true
+ring.workspace = true
+sha2.workspace = true
+url.workspace = true
+uuid.workspace = true
+axum.workspace = true
+dunce.workspace = true
+futures-util.workspace = true
+ignore.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+rmcp.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tokio-rustls.workspace = true
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+vatra-acp = { path = "../vatra-acp" }
+vatra-claude = { path = "../vatra-claude" }
+vatra-core = { path = "../vatra-core" }
+vatra-engine = { path = "../vatra-engine" }
+vatra-extensions = { path = "../vatra-extensions" }
+vatra-import = { path = "../vatra-import" }
+vatra-models = { path = "../vatra-models" }
+vatra-parity = { path = "../vatra-parity" }
+tempfile.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+rusqlite.workspace = true
+tokio-tungstenite.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Data_Xml_Dom", "UI_Notifications", "Win32_Foundation", "Win32_System_WinRT", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem"] }
+windows-sys = { workspace = true, features = ["Win32_System_Registry", "Win32_System_Environment"] }

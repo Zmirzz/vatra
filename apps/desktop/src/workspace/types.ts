@@ -1,0 +1,11 @@
+export type HubArea="schedule"|"calendar"|"email"|"research"|"compare";
+export type WorkspaceArea="conversations"|"documents"|"tasks"|HubArea;
+export const HUB_AREAS:HubArea[]=["schedule","calendar","email","research","compare"];
+export type WorkspaceSelection={projectId:number|null;area:WorkspaceArea;itemId:number|null};
+export type DocumentFormat="text"|"markdown"|"html"|"csv";
+export type WorkspaceItem={id:number;project_id:number;kind:string;title:string;body:string;fields:Record<string,unknown>;revision:number;created_at:number;updated_at:number;deleted_at:number|null;body_truncated?:boolean};
+export type ItemDraft={title:string;body:string;fields:Record<string,unknown>};
+export type Selection={start_utf16:number;end_utf16:number;selected_text:string};
+export type WorkspaceProposal={id:number;project_id:number;session_id:number;target_id:number|null;base_revision:number|null;state:"pending"|"applied"|"rejected";created_at:number;payload:{type:"edit";base_body:string;new_body:string}|{type:"tasks";items:{title:string;body:string;fields:Record<string,unknown>}[]}};
+export type Reminder={id:number;item_id:number;project_id:number;generation:number;due_at:number;state:"scheduled"|"attempted"|"submitted"|"blocked"|"failed"|"unknown"|"cancelled";attempted_at:number|null;result:string|null;title?:string};
+export const itemDraft=(item:WorkspaceItem):ItemDraft=>({title:item.title,body:item.body,fields:{...item.fields}});

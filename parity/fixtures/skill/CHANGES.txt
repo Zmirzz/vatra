@@ -1,0 +1,3 @@
+Added exponential backoff to network retries
+Fixed a crash when the config file is empty
+Renamed the lockfile to harness.lock

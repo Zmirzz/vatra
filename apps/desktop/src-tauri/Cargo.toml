@@ -1,0 +1,34 @@
+[package]
+name = "vatra-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[lib]
+name = "vatra_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vatra-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+thiserror.workspace = true
+tokio.workspace = true
+vatra-service = { path = "../../../crates/vatra-service" }
+
+[dev-dependencies]
+tempfile.workspace = true
+minisign-verify = "0.3"

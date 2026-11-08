@@ -1,0 +1,27 @@
+id = "02-rename"
+title = "Rename a function across files"
+prompt = "Rename the function getUser to fetchUser everywhere in this project. Don't change anything else."
+fixture = "rename"
+
+[[checks]]
+kind = "command_passes"
+command = "node check.js"
+
+[[checks]]
+kind = "file_not_contains"
+path = "user.js"
+text = "getUser"
+
+[[checks]]
+kind = "file_not_contains"
+path = "api.js"
+text = "getUser"
+
+[[checks]]
+kind = "file_not_contains"
+path = "cli.js"
+text = "getUser"
+
+[[checks]]
+kind = "file_unchanged"
+path = "check.js"

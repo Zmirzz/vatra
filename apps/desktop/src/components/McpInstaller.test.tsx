@@ -1,0 +1,22 @@
+import {render,screen} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {beforeEach,expect,test} from "vitest";
+import {ClientProvider} from "../rpc/context";
+import {FakeService} from "../rpc/fake";
+import {defaults,updatePreferences} from "../settings/preferences";
+import {McpInstaller} from "./McpInstaller";
+beforeEach(()=>updatePreferences(defaults()));
+test("MCP import requires preview and confirmation and never connects automatically",async()=>{
+ const service=new FakeService();service.open();
+ service.results["mcp.preview"]={servers:[{plan:{config:{name:"demo",command:"node.exe",args:["server.js"],env:{KEY:"${KEY}"},headers:{}},secretNames:["KEY"],reviewHash:"reviewed"},existing:null}]};
+ service.results["mcp.install"]={id:3,enabled:false};
+ render(<ClientProvider client={service.client}><McpInstaller initialDocument={'{"mcpServers":{}}'}/></ClientProvider>);
+ expect(screen.queryByRole("button",{name:"Confirm save demo"})).toBeNull();
+ await userEvent.click(screen.getByRole("button",{name:"Review configuration"}));
+ expect((await screen.findAllByText(/node.exe/)).length).toBeGreaterThan(0);
+ expect(service.calls("mcp.install")).toHaveLength(0);
+ await userEvent.click(screen.getByRole("button",{name:"Confirm save demo"}));
+ expect(service.calls("mcp.install")[0]).toMatchObject({reviewHash:"reviewed"});
+ expect(service.calls("mcp.connect")).toHaveLength(0);
+ expect(service.calls("mcp.test")).toHaveLength(0);
+});

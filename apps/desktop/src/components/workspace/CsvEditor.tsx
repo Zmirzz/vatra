@@ -1,0 +1,9 @@
+import {useMemo,useState} from "react";
+import {copy} from "../../copy";
+import {parseCsv,serializeCsv} from "../../workspace/formats";
+export function CsvEditor({body,onChange}:{body:string;onChange:(body:string)=>void}){
+ const [page,setPage]=useState(0);const [error,setError]=useState(false);const rows=useMemo(()=>{try{return parseCsv(body);}catch{return null;}},[body]);if(!rows)return <p role="alert" className="workspace-notice">{copy.workspace.fileError}</p>;
+ const columns=rows[0]?.length??1;const pages=Math.max(1,Math.ceil(rows.length/100));const current=Math.min(page,pages-1);
+ const change=(next:string[][])=>{try{onChange(serializeCsv(next));setError(false);}catch{setError(true);}};
+ return <div className="workspace-csv"><div className="workspace-actions"><button type="button" onClick={()=>change([...rows,new Array(columns).fill("")])} disabled={(rows.length+1)*columns>50000||rows.length>=10000}>{copy.workspace.addRow}</button><button type="button" onClick={()=>change(rows.length?rows.map(r=>[...r,""]):[["",""]])} disabled={columns>=100||(columns+1)*rows.length>50000}>{copy.workspace.addColumn}</button></div>{error?<p role="alert">{copy.workspace.fileError}</p>:null}<div className="workspace-table-scroll"><table><tbody>{rows.slice(current*100,current*100+100).map((row,r)=><tr key={r}><th scope="row">{current*100+r+1}</th>{row.map((cell,c)=><td key={c}><textarea rows={1} aria-label={`${copy.workspace.text} ${current*100+r+1}, ${c+1}`} value={cell} onChange={e=>{const next=rows.map(values=>[...values]);next[current*100+r][c]=e.target.value;change(next);}}/></td>)}</tr>)}</tbody></table></div><div className="workspace-pagination"><button type="button" disabled={current===0} onClick={()=>setPage(current-1)}>{copy.workspace.previous}</button><span>{copy.workspace.page} {current+1} / {pages}</span><button type="button" disabled={current+1>=pages} onClick={()=>setPage(current+1)}>{copy.workspace.next}</button></div></div>;
+}

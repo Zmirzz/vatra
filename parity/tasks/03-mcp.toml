@@ -1,0 +1,14 @@
+id = "03-mcp"
+title = "Call an MCP tool and write its result"
+prompt = "Use the echo tool from the connected tools to echo the text parity-ok-417, then write exactly what it returned into result.txt."
+fixture = "mcp"
+needs_mcp = true
+
+[[checks]]
+kind = "tool_used"
+any_of = ["echo"]
+
+[[checks]]
+kind = "file_contains"
+path = "result.txt"
+text = "parity-ok-417"

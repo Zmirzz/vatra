@@ -1,0 +1,21 @@
+import {beforeEach,expect,it} from "vitest";
+import {act,render,screen,waitFor} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {FakeService} from "../../rpc/fake";
+import {ClientProvider} from "../../rpc/context";
+import {AutosaveController} from "../../workspace/autosave";
+import {initialState,useAppStore} from "../../state/store";
+import type {WorkspaceItem} from "../../workspace/types";
+import {WorkspaceAgentPanel} from "./WorkspaceAgentPanel";
+const item:WorkspaceItem={id:1,project_id:1,kind:"note",title:"Note",body:"original",fields:{},revision:1,created_at:1,updated_at:1,deleted_at:null};
+beforeEach(()=>useAppStore.setState({...initialState(),agents:["paid"],agentsLoaded:true}));
+it("does not start an agent on open and requires explicit per-request cost consent",async()=>{const fake=new FakeService();fake.open();fake.results["workspace.ai.status"]={supported:true,costs:true};fake.results["workspace.ai.state"]=[];fake.results["workspace.proposals.list"]=[];fake.results["sessions.create"]={id:42};fake.results["sessions.list"]=[];fake.results["workspace.ai.start"]={};const controller=new AutosaveController(item,async()=>item);render(<ClientProvider client={fake.client}><WorkspaceAgentPanel open item={item} controller={controller} selection={null} selectionUnavailable={false} onClose={()=>{}}/></ClientProvider>);
+ expect(fake.calls("workspace.ai.start")).toHaveLength(0);await userEvent.selectOptions(screen.getByRole("combobox",{name:"Agent"}),"paid");await screen.findByText(/paid API or subscription/);await userEvent.type(screen.getByRole("textbox",{name:"What would you like to change?"}),"Improve this");expect((screen.getByRole("button",{name:"Ask for a suggestion"}) as HTMLButtonElement).disabled).toBe(true);await userEvent.click(screen.getByRole("checkbox",{name:"I agree to use this agent for this request"}));await userEvent.click(screen.getByRole("button",{name:"Ask for a suggestion"}));await waitFor(()=>expect(fake.calls("workspace.ai.start")).toHaveLength(1));expect(fake.calls("workspace.ai.start")[0].consent_cost).toBe(true);expect(controller.snapshot().draft.body).toBe("original");
+});
+it("Stop addresses the active workspace session and keeps the document intact",async()=>{const fake=new FakeService();fake.open();fake.results["workspace.ai.state"]=[{session_id:42,agent:"paid"}];fake.results["workspace.proposals.list"]=[];const controller=new AutosaveController(item,async()=>item);render(<ClientProvider client={fake.client}><WorkspaceAgentPanel open item={item} controller={controller} selection={null} selectionUnavailable={false} onClose={()=>{}}/></ClientProvider>);await userEvent.click(await screen.findByRole("button",{name:"Stop"}));expect(fake.calls("turn.stop")).toEqual([{session_id:42}]);expect(controller.snapshot().draft.body).toBe("original");expect(fake.calls("workspace.items.save")).toHaveLength(0);});
+it("recovers a turn completed while disconnected without reopening the panel",async()=>{
+ const fake=new FakeService();fake.open();fake.results["workspace.ai.state"]=[{session_id:42,agent:"paid"}];fake.results["workspace.ai.status"]={supported:true,costs:false};fake.results["workspace.proposals.list"]=[];const controller=new AutosaveController(item,async()=>item);
+ render(<ClientProvider client={fake.client}><WorkspaceAgentPanel open item={item} controller={controller} selection={null} selectionUnavailable={false} onClose={()=>{}}/></ClientProvider>);await screen.findByRole("button",{name:"Stop"});
+ act(()=>fake.drop());fake.results["workspace.ai.state"]=[];act(()=>fake.reconnect());
+ await waitFor(()=>expect(screen.queryByRole("button",{name:"Stop"})).toBeNull());expect((screen.getByRole("textbox",{name:"What would you like to change?"}) as HTMLTextAreaElement).disabled).toBe(false);expect(fake.calls("workspace.ai.start")).toHaveLength(0);
+});

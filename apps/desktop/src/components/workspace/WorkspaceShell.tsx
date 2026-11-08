@@ -1,0 +1,25 @@
+import {useState} from "react";
+import {copy} from "../../copy";
+import {useClient} from "../../rpc/context";
+import type {Project} from "../../rpc/types";
+import {useAppStore} from "../../state/store";
+import {navigateWorkspace,useWorkspace} from "../../workspace/store";
+import {DocumentsPage} from "./DocumentsPage";
+import {DocumentSurface} from "./DocumentSurface";
+import {TasksPage} from "./TasksPage";
+import {SchedulePage} from "../hub/SchedulePage";
+import {CalendarPage} from "../hub/CalendarPage";
+import {EmailPage} from "../hub/EmailPage";
+import {ResearchPage} from "../hub/ResearchPage";
+import {ComparePage} from "../hub/ComparePage";
+import {useHubFocus} from "../../hub/focus";
+export function WorkspaceShell(){const {cache,navigationError}=useWorkspace();const selection=cache.selection;const projects=useAppStore(s=>s.projects);const rpc=useClient();const researchFocus=useHubFocus(s=>s.researchId);const [name,setName]=useState("");const [error,setError]=useState(false);const [creating,setCreating]=useState(false);
+ const create=async()=>{if(!name.trim()||creating)return;setCreating(true);setError(false);try{const project=await rpc.call<Project>("projects.create",{name:name.trim(),path:null});useAppStore.setState(s=>({projects:[...s.projects,project]}));await navigateWorkspace({...selection,projectId:project.id,itemId:null});}catch{setError(true);}finally{setCreating(false);}};
+ const openAccounts=()=>useAppStore.setState({settingsPage:"accounts"});
+ if(selection.area==="schedule")return <div className="workspace-shell"><SchedulePage/></div>;
+ if(selection.area==="calendar")return <div className="workspace-shell"><CalendarPage/></div>;
+ if(selection.area==="email")return <div className="workspace-shell"><EmailPage onOpenSettings={openAccounts}/></div>;
+ if(selection.area==="research")return <div className="workspace-shell"><ResearchPage onOpenSettings={openAccounts} focus={researchFocus}/></div>;
+ if(selection.area==="compare")return <div className="workspace-shell"><ComparePage/></div>;
+ return <div className="workspace-shell"><header className="workspace-project"><label>{copy.workspace.project}<select aria-label={copy.workspace.project} value={selection.projectId??""} onChange={e=>void navigateWorkspace({...selection,projectId:Number(e.target.value),itemId:null})}><option value="" disabled>{copy.workspace.chooseProject}</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></header>{navigationError?<p className="workspace-notice" role="alert">{copy.workspace.navigationBlocked}</p>:null}{selection.projectId===null?<div className="workspace-no-project"><h1>{copy.workspace[selection.area]}</h1><p>{copy.workspace.noProjects}</p><form onSubmit={e=>{e.preventDefault();void create();}}><label>{copy.workspace.projectName}<input value={name} maxLength={240} onChange={e=>setName(e.target.value)}/></label><button className="primary" disabled={creating||!name.trim()}>{copy.workspace.newProject}</button></form>{error?<p role="alert">{copy.workspace.projectError}</p>:null}</div>:selection.area==="tasks"?<TasksPage key={selection.projectId} projectId={selection.projectId}/>:<DocumentsPage key={`${selection.projectId}/${selection.area}`} projectId={selection.projectId} renderEditor={selection.area==="documents"?item=><DocumentSurface key={item.id} item={item}/>:undefined}/>}</div>;
+}

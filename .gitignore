@@ -1,0 +1,9 @@
+target/
+*.db
+vatra.toml
+.superpowers/
+node_modules/
+dist/
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
+apps/desktop/public/pdfjs/

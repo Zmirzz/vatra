@@ -1,0 +1,10 @@
+import {beforeEach,expect,it} from "vitest";
+import {render,screen,waitFor} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {FakeService} from "../../rpc/fake";
+import {ClientProvider} from "../../rpc/context";
+import {initialState,useAppStore} from "../../state/store";
+import {resetWorkspace,workspaceCache} from "../../workspace/store";
+import {TasksPage} from "./TasksPage";
+beforeEach(()=>{resetWorkspace();useAppStore.setState({...initialState(),projects:[{id:1,name:"p",path:null}]});workspaceCache.select({projectId:1,area:"tasks",itemId:null});});
+it("uses server-filtered Today/Upcoming/Completed views and does not start an agent",async()=>{const fake=new FakeService();fake.open();fake.results["workspace.items.list"]=[];fake.results["reminders.list"]=[];fake.results["reminders.status"]={state:"unavailable"};render(<ClientProvider client={fake.client}><TasksPage projectId={1}/></ClientProvider>);await waitFor(()=>expect(fake.calls("workspace.items.list")[0].task_view).toBe("today"));await userEvent.click(screen.getByRole("button",{name:"Upcoming"}));await waitFor(()=>expect(fake.calls("workspace.items.list").at(-1)?.task_view).toBe("upcoming"));await userEvent.click(screen.getByRole("button",{name:"Completed"}));await waitFor(()=>expect(fake.calls("workspace.items.list").at(-1)?.task_view).toBe("completed"));expect(fake.calls("workspace.ai.start")).toHaveLength(0);});
