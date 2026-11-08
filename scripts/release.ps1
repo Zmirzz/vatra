@@ -33,8 +33,11 @@ $manifest = [ordered]@{
 }
 $latest = Join-Path $dir 'latest.json'
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $latest
+$ErrorActionPreference = 'Continue'
 gh release view $tag --repo Zmirzz/vatra *> $null
-if ($LASTEXITCODE -eq 0) {
+$exists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = 'Stop'
+if ($exists) {
   # The release exists (a rebuild of the same version): replace its files.
   gh release upload $tag $exe $sig $latest --repo Zmirzz/vatra --clobber
 } else {
