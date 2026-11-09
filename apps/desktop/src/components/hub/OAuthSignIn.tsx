@@ -9,12 +9,16 @@ const en = {
   title: "Sign in with your account", google: "Sign in with Google", microsoft: "Sign in with Microsoft",
   waiting: "Finish signing in in your browser, then come back here…", done: (address: string) => `Added ${address}.`,
   or: "Or use an app password", setup: "Set up sign-in", setupHelp: "Sign-in needs an ID from the provider's developer console. Paste it once; Vatra remembers it.",
+  notReady: (name: string) => `Signing in with ${name} isn't available in this version yet. Use an app password below instead.`,
+  own: "I have my own sign-in ID",
   clientId: "Client ID", clientSecret: "Client secret (Google only)", saveSetup: "Save the ID", cancel: "Cancel", failed: "Signing in didn't work. Try again.",
 };
 const ro = {
   title: "Conectează-te cu contul tău", google: "Conectează-te cu Google", microsoft: "Conectează-te cu Microsoft",
   waiting: "Termină conectarea în browser, apoi revino aici…", done: (address: string) => `Am adăugat ${address}.`,
-  or: "Sau folosește o parolă de aplicație", setup: "Pregătește conectarea", setupHelp: "Conectarea are nevoie de un ID din consola pentru dezvoltatori a furnizorului. Lipește-l o dată; Vatra îl ține minte.",
+  or: "Sau folosește o parolă de aplicație", setup: "Pregătește conectarea",
+  notReady: (name: string) => `Conectarea cu ${name} nu este încă disponibilă în această versiune. Folosește mai jos o parolă de aplicație.`,
+  own: "Am propriul meu ID de conectare", setupHelp: "Conectarea are nevoie de un ID din consola pentru dezvoltatori a furnizorului. Lipește-l o dată; Vatra îl ține minte.",
   clientId: "ID client", clientSecret: "Secret client (doar Google)", saveSetup: "Salvează ID-ul", cancel: "Renunță", failed: "Conectarea nu a mers. Încearcă din nou.",
 };
 
@@ -26,6 +30,7 @@ export function OAuthSignIn({purpose, name, onSaved}: {purpose: "email" | "calen
   const [message, setMessage] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [setup, setSetup] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const alive = useRef(true);
@@ -69,13 +74,17 @@ export function OAuthSignIn({purpose, name, onSaved}: {purpose: "email" | "calen
       <div className="hub-actions">
         {shown.map((p) => (
           <button key={p.id} type="button" className="primary" disabled={waiting}
-            onClick={() => (p.ready ? void begin(p.id) : setSetup(p.id))}>
+            onClick={() => (p.ready ? void begin(p.id) : setUnavailable(p.id))}>
             {p.id === "google" ? c.google : c.microsoft}
           </button>
         ))}
       </div>
       {waiting ? <p role="status" className="hub-meta">{c.waiting}</p> : null}
       {message ? <p role="status" className="hub-meta">{message}</p> : null}
+      {unavailable && !setup ? (
+        <p role="status" className="hub-meta">{c.notReady(unavailable === "google" ? "Google" : "Microsoft")}{" "}
+          <button type="button" className="link" onClick={() => { setSetup(unavailable); setUnavailable(null); }}>{c.own}</button></p>
+      ) : null}
       {setup ? (
         <div className="hub-form" aria-label={c.setup}>
           <p className="hub-meta">{c.setupHelp}</p>

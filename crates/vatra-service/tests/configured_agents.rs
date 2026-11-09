@@ -288,3 +288,22 @@ async fn catalogue_errors_do_not_echo_provider_body_or_credentials() {
     assert!(error.contains("401"));
     assert!(!error.contains("synthetic-secret"));
 }
+
+#[test]
+fn asking_an_acp_agent_for_its_models_works_outside_any_project() {
+    use std::sync::Arc;
+    use vatra_service::{BuildRequest, ConfigAgents, PermissionMode, TurnOptions};
+    let mut config = Config::empty();
+    config.agents.insert("codex-acp".into(), AgentConfig::Acp {
+        binary: "node".into(), args: vec![], subscription: true, chatgpt_plan: false, codex_binary: None,
+        startup_timeout_sec: 30, turn_timeout_sec: 900,
+    });
+    // The picker asks before any conversation exists: no project and no session yet.
+    let request = BuildRequest {
+        name: "codex-acp".into(), session_id: 0, project_id: 0,
+        approver: Arc::new(vatra_engine::DenyAll), questioner: Arc::new(vatra_engine::NoQuestions),
+        mode: PermissionMode::Supervised, cwd: None, options: TurnOptions::default(),
+    };
+    let found = ConfigAgents::new(config).acp_config(&request).unwrap();
+    assert!(found.cwd.ends_with("chats"), "{:?}", found.cwd);
+}

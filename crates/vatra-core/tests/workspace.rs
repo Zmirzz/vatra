@@ -137,7 +137,7 @@ fn a_database_at_version_5_gains_the_workspace_tables() {
     let id = store.create_item(&new_item("document", "după migrare"), 1).unwrap();
     assert!(store.item(id).unwrap().is_some());
     drop(store);
-    assert_eq!(count(&path, "PRAGMA user_version"), 14);
+    assert_eq!(count(&path, "PRAGMA user_version"), 15);
     assert_eq!(count(&path, "SELECT COUNT(*) FROM item_links"), 0);
 }
 
@@ -412,7 +412,7 @@ fn backup_opens_as_a_store_with_the_same_items() {
     assert_eq!(restored.linked_items(note).unwrap().len(), 1);
     assert_eq!(restored.search_workspace("păstrat", &[], 10).unwrap().len(), 1);
     drop(restored);
-    assert_eq!(count(&copy, "PRAGMA user_version"), 14);
+    assert_eq!(count(&copy, "PRAGMA user_version"), 15);
 }
 
 #[test]

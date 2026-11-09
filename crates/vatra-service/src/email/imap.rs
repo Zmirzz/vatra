@@ -149,7 +149,7 @@ impl Imap {
         }
         let set = uids.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
         let responses = self
-            .command(&format!("UID FETCH {set} (UID FLAGS BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])"))
+            .command(&format!("UID FETCH {set} (UID FLAGS BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID LIST-UNSUBSCRIBE LIST-ID PRECEDENCE)])"))
             .await?;
         let mut out = Vec::new();
         for response in responses {

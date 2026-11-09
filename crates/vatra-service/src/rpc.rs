@@ -100,6 +100,7 @@ fn runs_long(text: &str) -> bool {
                     | "import.apply"
                     | "import.history"
                     | "agents.options"
+                    | "limits.refresh"
                     | "chatgpt.status"
                     | "chatgpt.logout"
                     | "hardware.get"
@@ -766,7 +767,9 @@ async fn dispatch(service: &Arc<Service>, method: &str, params: Value) -> RpcRes
         "agents.providers" | "copilot.start" | "copilot.poll" | "copilot.models" | "agents.provider_models" | "agents.detect" | "agents.configured" | "agents.save"
         | "agents.remove" | "agents.summarizer" | "agents.form" => crate::setup::handle(service, method, params).await,
         method if method.starts_with("semantic.") => crate::semantic::handle(service, method, params).await,
+        method if method.starts_with("limits.") => crate::limits::handle(service, method, params).await,
         method if method.starts_with("health.") => crate::health::handle(service, method, params).await,
+        method if crate::memory::handles(method) => crate::memory::handle(service, method, params).await,
         method if crate::oauth::handles(method) => crate::oauth::handle(service, method, params).await,
         method if crate::research::handles(method) => crate::research::handle(service, method, params).await,
         method if crate::email::handles(method) => crate::email::handle(service, method, params).await,

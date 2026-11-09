@@ -21,6 +21,8 @@ mod workspace_ai;
 mod reminders;
 mod schedule;
 mod semantic;
+mod user_memory;
+pub use user_memory::{MAX_MEMORIES, MAX_MEMORY_CHARS, MEMORY_CATEGORIES, UserMemory, checked_category, checked_memory_text, unix_now as user_memory_now};
 pub use semantic::{SemanticHit, SemanticSource, SemanticStats, chunk_text};
 mod project_delete;
 pub use project_delete::ProjectRemoval;
@@ -36,7 +38,7 @@ pub use app_tables::{ConfiguredAgentRow, ParityRunRow};
 pub use audit::AuditEntry;
 pub use connectors::ConnectorRow;
 pub use agent::{Agent, AgentError, RunError, TurnOutcome, TurnRequest, TurnFile, run_turn, run_turn_with_files, input_with_files};
-pub use event::{Event, HandoffBrief, StoredEvent};
+pub use event::{Event, HandoffBrief, LimitWindow, StoredEvent};
 pub use handoff::{
     BriefFields, Summarizer, build_brief, create_handoff_session, handoff, history_transcript,
     relevant_files, render_handoff_prompt, run_handoff, transcript,

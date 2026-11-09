@@ -12,7 +12,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::Value;
 
-pub use adapter::{AcpAgent, AcpChoice, AcpOptions, probe_options};
+pub use adapter::{AcpAgent, AcpChoice, AcpOptions, probe_command, probe_options};
 pub use extras::{
     AcpExtras, AgentCommands, McpCapabilities, PermissionCheck, acp_mcp_servers, expand_prompt,
     first_prompt_preamble, permission_checks,

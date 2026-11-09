@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::event::{Event, StoredEvent};
 
-const SCHEMA_VERSION: i64 = 14;
+const SCHEMA_VERSION: i64 = 15;
 /// How long a write waits for another connection to the same file, such as the extension catalog's.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 const TITLE_MAX_CHARS: usize = 60;
@@ -238,6 +238,9 @@ fn migrate(connection: &mut Connection, version: i64) -> Result<(), StoreError> 
     }
     if version < 14 {
         transaction.execute_batch(crate::semantic::SCHEMA)?;
+    }
+    if version < 15 {
+        transaction.execute_batch(crate::user_memory::SCHEMA)?;
     }
     transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     transaction.commit()?;

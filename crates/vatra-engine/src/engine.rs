@@ -128,12 +128,20 @@ pub struct EngineAgent {
     session_id: Option<i64>,
     /// The effort a person picked for the turn. It wins over the effort a skill asks for.
     effort_override: Option<String>,
+    /// What every agent knows about the person, as the prompt carries it. Read again by each turn's agent.
+    profile: Option<String>,
 }
 
 impl EngineAgent {
     /// Sets the effort the person picked for the turns of this agent.
     pub fn with_effort(mut self, effort: Option<String>) -> EngineAgent {
         self.effort_override = effort;
+        self
+    }
+
+    /// Adds what is known about the person to the system prompt, ahead of the project's own memory folder.
+    pub fn with_profile(mut self, profile: Option<String>) -> EngineAgent {
+        self.profile = profile;
         self
     }
 
@@ -157,6 +165,7 @@ impl EngineAgent {
             audit: setup.audit,
             session_id: setup.session_id,
             effort_override: None,
+            profile: None,
         }
     }
 
@@ -630,7 +639,13 @@ impl Agent for EngineAgent {
         let context_window = self.driver.context_window();
         let mut deferred = self.deferred_tools(context_window, &request.history);
         let deferred_tools = !deferred.names.is_empty();
-        let memory = self.memory.as_deref().and_then(memory_block);
+        let memory = match (self.profile.as_deref(), self.memory.as_deref().and_then(memory_block)) {
+            (Some(profile), Some(folder)) => Some(format!("{profile}
+
+{folder}")),
+            (Some(profile), None) => Some(profile.to_string()),
+            (None, folder) => folder,
+        };
         let date = chrono::Local::now().format("%Y-%m-%d").to_string();
         // The files the history touched decide which path-scoped skills the model is shown.
         let mut seen = self.history_touched(&request.history);

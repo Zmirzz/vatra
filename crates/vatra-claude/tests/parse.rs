@@ -124,7 +124,15 @@ fn missing_fields_fall_back_to_unmapped_not_panic() {
 #[test]
 fn rate_limit_and_usage_values_are_read() {
     let parsed = parse_line(r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":5}}"#);
-    assert_eq!(parsed, vec![Parsed::Event(Event::RateLimit { status: "allowed".into(), resets_at: Some(5) })]);
+    assert_eq!(parsed, vec![Parsed::Event(Event::RateLimit { status: "allowed".into(), resets_at: Some(5), windows: vec![] })]);
     let parsed = parse_line(r#"{"type":"result","is_error":false,"total_cost_usd":0.5,"usage":{"input_tokens":3,"output_tokens":4}}"#);
     assert!(parsed.contains(&Parsed::Event(Event::Usage { input_tokens: 3, output_tokens: 4, cost_usd: Some(0.5) })));
+}
+
+#[test]
+fn rate_limit_windows_are_read() {
+    let parsed = parse_line(r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":5,"unifiedWindows":{"five_hour":{"utilization":0.72,"resetsAt":5},"seven_day":{"utilization":0.09,"resetsAt":9}}}}"#);
+    let Parsed::Event(Event::RateLimit { windows, .. }) = &parsed[0] else { panic!("{parsed:?}") };
+    assert_eq!(windows.len(), 2);
+    assert!(windows.iter().any(|w| w.name == "five_hour" && (w.used - 0.72).abs() < 1e-9 && w.resets_at == Some(5)));
 }

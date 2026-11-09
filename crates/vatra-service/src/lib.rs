@@ -20,6 +20,8 @@ pub mod email;
 pub mod research;
 pub mod semantic;
 pub mod health;
+pub mod limits;
+pub mod memory;
 pub mod ntfy;
 pub mod telegram;
 mod import;

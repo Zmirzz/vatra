@@ -68,10 +68,11 @@ fn generated_arguments_and_original_approval_bridge_coexist() {
         serde_json::from_str(&args[args.iter().position(|v| v == "--mcp-config").unwrap() + 1])
             .unwrap();
     assert!(config["mcpServers"]["vatra"].is_object());
-    assert!(!args.iter().any(|a| matches!(
-        a.as_str(),
-        "--agents" | "--strict-mcp-config" | "--bare" | "--setting-sources"
-    )));
+    assert!(!args.iter().any(|a| matches!(a.as_str(), "--agents" | "--bare")));
+    // Claude Code's own plugins, MCP servers and hooks stay out: Vatra brings its own.
+    assert!(args.contains(&"--strict-mcp-config".to_string()));
+    assert!(args.windows(2).any(|w| w == ["--setting-sources", ""]));
+    assert!(args.windows(2).any(|w| w == ["--settings", r#"{"disableAllHooks":true}"#]));
 }
 
 #[test]

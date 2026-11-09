@@ -5,6 +5,7 @@
 //! anything happen. The only way a message leaves is `email.send`, which sends a saved draft exactly as the person saw
 //! it (the fingerprint they were shown must still match), once, within an hourly limit, and writes it to the audit log.
 
+mod images;
 mod imap;
 pub mod mime;
 pub mod net;
@@ -302,6 +303,7 @@ pub async fn handle(service: &Arc<Service>, method: &str, params: Value) -> Repl
                     json!({
                         "uid": h.uid, "key": key, "from": parsed.from, "subject": parsed.subject, "date": parsed.date,
                         "seen": h.seen, "flagged": h.flagged, "labels": meta.labels, "triage": meta.triage, "summary": meta.summary,
+                        "category": parsed.category,
                     })
                 })
                 .collect();
@@ -313,10 +315,29 @@ pub async fn handle(service: &Arc<Service>, method: &str, params: Value) -> Repl
             let meta = store.email_meta(&account.id, &key).map_err(store_error)?;
             Ok(json!({
                 "uid": request.uid, "key": key, "from": parsed.from, "to": parsed.to, "subject": parsed.subject,
-                "date": parsed.date, "text": parsed.text, "message_id": parsed.message_id,
-                // Everything in a message is written by someone else; the app shows it as plain text only.
+                "date": parsed.date, "text": parsed.text, "html": parsed.html, "message_id": parsed.message_id, "category": parsed.category,
+                "attachments": parsed.attachments.iter().map(|a| json!({"name": a.name, "type": a.kind, "size": a.size, "preview": a.preview})).collect::<Vec<_>>(),
+                // Everything in a message is written by someone else; the app cleans it and shows it without any way to act.
                 "untrusted": true, "labels": meta.labels, "triage": meta.triage, "summary": meta.summary,
             }))
+        }
+        "email.images" => {
+            #[derive(Deserialize)]
+            struct Images {
+                urls: Vec<String>,
+            }
+            let request: Images = parse(params)?;
+            if request.urls.len() > 40 {
+                return Err((INVALID, "Too many pictures at once.".into()));
+            }
+            let fetched = futures_util::future::join_all(request.urls.iter().take(40).map(|url| images::fetch(url))).await;
+            let mut found = serde_json::Map::new();
+            for (url, result) in request.urls.iter().zip(fetched) {
+                if let Some(uri) = result {
+                    found.insert(url.clone(), json!(uri));
+                }
+            }
+            Ok(json!({"images": found}))
         }
         "email.mark" => {
             #[derive(Deserialize)]

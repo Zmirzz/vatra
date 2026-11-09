@@ -447,6 +447,9 @@ impl Service {
     }
 
     fn announce(&self, stored: StoredEvent) {
+        if let Event::RateLimit { windows, .. } = &stored.event {
+            crate::limits::record_claude(&self.store, windows);
+        }
         if matches!(stored.event, Event::ToolResult { .. })
             && let Ok(Some(scope)) = self.store.workspace_turn_context(stored.session_id) {
                 self.notify(Notification::WorkspaceProposalsChanged { project_id: scope.project_id, target_id: Some(scope.item_id) });

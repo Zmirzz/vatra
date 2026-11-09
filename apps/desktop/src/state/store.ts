@@ -12,7 +12,7 @@ export type AppState = {
   subscriptionAgents:string[];
   importedSession: ImportedConversation | null;
   /** A Settings page another screen asked to open, like Models from the start screen. */
-  settingsPage: "general" | "agents" | "import" | "extensions" | "account" | "models" | "market" | "acp-market" | "mcp-market" | "mcp-installed" | "skills" | "accounts" | "status" | null;
+  settingsPage: "general" | "agents" | "import" | "extensions" | "account" | "models" | "market" | "acp-market" | "mcp-market" | "mcp-installed" | "skills" | "accounts" | "status" | "limits" | "memory" | null;
   setupRequested: boolean;
   preferredAgent: string | null;
   openingImportedId: number | null;

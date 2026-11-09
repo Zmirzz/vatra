@@ -79,6 +79,13 @@ pub fn claude_args(config: &ClaudeConfig, native_session: Option<&str>) -> Vec<S
         "stream-json",
         "--verbose",
         "--forward-subagent-text",
+        // Vatra supplies its own tools and skills. Claude Code's personal plugins, MCP servers and hooks would only
+        // slow every turn down (and fail to connect), so none of them load.
+        "--setting-sources",
+        "",
+        "--settings",
+        r#"{"disableAllHooks":true}"#,
+        "--strict-mcp-config",
         "--mcp-config",
     ]
     .map(String::from)

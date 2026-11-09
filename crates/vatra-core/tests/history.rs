@@ -170,7 +170,7 @@ fn schema_two_to_three_preserves_events_and_backfills_only_conversation_text_onc
         check
             .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
             .unwrap(),
-        14
+        15
     );
     assert_eq!(
         check

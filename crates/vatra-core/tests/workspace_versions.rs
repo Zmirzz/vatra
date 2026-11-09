@@ -163,7 +163,7 @@ fn v6_migrates_to_v7_without_changing_item_bodies() {
         connection
             .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
             .unwrap(),
-        14
+        15
     );
     for table in [
         "workspace_proposals",

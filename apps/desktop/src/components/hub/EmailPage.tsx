@@ -1,6 +1,9 @@
-import {Bell, Mail, PenLine, Sparkles, Star, Tags} from "lucide-react";
+import {Bell, Inbox as InboxIcon, Mail, MessagesSquare, PenLine, Search, Sparkles, Star, Tag, Tags, Users, Info} from "lucide-react";
 import {useCallback, useEffect, useState, type FormEvent} from "react";
 import {useHubCopy} from "../../hub/copy";
+import {initial, senderAddress, senderName, shortDate} from "../../hub/emailHtml";
+import {usePreferences} from "../../settings/preferences";
+import {Attachments, MailBody} from "./MailBody";
 import {fromInput, toInputDate, toInputTime} from "../../hub/time";
 import type {Account, Draft, MailHeader, MailMessage} from "../../hub/types";
 import {RpcError} from "../../rpc/client";
@@ -8,6 +11,10 @@ import {useClient} from "../../rpc/context";
 import {useAppStore} from "../../state/store";
 
 type View = "inbox" | "drafts";
+const CATEGORIES = ["all", "primary", "promotions", "social", "updates", "forums"] as const;
+type Category = (typeof CATEGORIES)[number];
+const CATEGORY_ICON = {all: InboxIcon, primary: Mail, promotions: Tag, social: Users, updates: Info, forums: MessagesSquare};
+const categoryOf = (m: {category?: string}): Exclude<Category, "all"> => (CATEGORIES.includes(m.category as Category) && m.category !== "all" ? (m.category as Exclude<Category, "all">) : "primary");
 const FIXED_FOLDER = "INBOX";
 
 export function EmailPage({onOpenSettings}: {onOpenSettings: () => void}) {
@@ -66,6 +73,10 @@ function Inbox({account, onDraft}: {account: string; onDraft: () => void}) {
   const [instructions, setInstructions] = useState("");
   const [labelDraft, setLabelDraft] = useState("");
   const [reminding, setReminding] = useState(false);
+  const [category, setCategory] = useState<Category>("all");
+  const [query, setQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const language = usePreferences((state) => state.preferences.language);
 
   const load = useCallback(async (before?: number) => {
     try {
@@ -80,7 +91,14 @@ function Inbox({account, onDraft}: {account: string; onDraft: () => void}) {
   const patch = (key: string, change: Partial<MailHeader>) => setMessages((old) => old?.map((m) => (m.key === key ? {...m, ...change} : m)) ?? old);
   const read = async (header: MailHeader) => {
     setBusy("read"); setError(null);
-    try { setOpen(await rpc.call<MailMessage>("email.read", {account, folder: FIXED_FOLDER, uid: header.uid})); } catch (e) { setError(errorText(e, t)); } finally { setBusy(null); }
+    try {
+      setOpen(await rpc.call<MailMessage>("email.read", {account, folder: FIXED_FOLDER, uid: header.uid}));
+      // Opening a message reads it, as in any mail app.
+      if (!header.seen) {
+        patch(header.key, {seen: true});
+        void rpc.call("email.mark", {account, folder: FIXED_FOLDER, uid: header.uid, seen: true}).catch(() => patch(header.key, {seen: false}));
+      }
+    } catch (e) { setError(errorText(e, t)); } finally { setBusy(null); }
   };
   const run = async (name: string, work: () => Promise<void>) => {
     setBusy(name); setError(null);
@@ -115,18 +133,45 @@ function Inbox({account, onDraft}: {account: string; onDraft: () => void}) {
     });
   };
 
+  const counts = Object.fromEntries(CATEGORIES.map((c) => [c, (messages ?? []).filter((m) => !m.seen && (c === "all" || categoryOf(m) === c)).length])) as Record<Category, number>;
+  const needle = query.trim().toLowerCase();
+  const shown = (messages ?? []).filter((m) => (category === "all" || categoryOf(m) === category) && (!unreadOnly || !m.seen) && (!needle || `${m.from} ${m.subject}`.toLowerCase().includes(needle)));
+  const current = open ? messages?.find((m) => m.key === open.key) : undefined;
+
   return (
     <div className="email-layout">
       <section className="email-list" aria-label={t.inbox}>
-        <div className="email-toolbar"><button type="button" onClick={() => void sortAll()} disabled={busy !== null || !messages?.length}><Sparkles size={14} aria-hidden="true" />{busy === "triage" ? t.working : t.sortMail}</button></div>
+        <div className="email-list-head">
+          <div className="email-cats" role="tablist" aria-label={t.inbox}>
+            {CATEGORIES.map((c) => {
+              const Icon = CATEGORY_ICON[c];
+              return (
+                <button key={c} type="button" role="tab" data-category={c} aria-selected={category === c} onClick={() => setCategory(c)}>
+                  <Icon size={14} aria-hidden="true" />{t.categories[c]}
+                  {counts[c] > 0 ? <span className="count" aria-label={t.unreadCount(counts[c])}>{counts[c]}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <div className="email-find">
+            <label><Search size={14} aria-hidden="true" /><input type="search" value={query} placeholder={t.searchMail} aria-label={t.searchMail} onChange={(e) => setQuery(e.target.value)} /></label>
+            <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>{t.unreadOnly}</button>
+            <button type="button" onClick={() => void sortAll()} disabled={busy !== null || !messages?.length}><Sparkles size={14} aria-hidden="true" />{busy === "triage" ? t.working : t.sortMail}</button>
+          </div>
+        </div>
         {error ? <p role="alert" className="hub-error">{error}</p> : null}
-        {messages === null ? <p role="status">{t.loading}</p> : null}
-        {messages && messages.length === 0 && !error ? <p className="hub-meta">{t.noMessages}</p> : null}
+        {messages === null ? <p role="status" className="email-empty">{t.loading}</p> : null}
+        {messages && messages.length === 0 && !error ? <p className="email-empty">{t.noMessages}</p> : null}
+        {messages && messages.length > 0 && shown.length === 0 ? <p className="email-empty">{needle || unreadOnly ? t.noMatches : t.nothingHere}</p> : null}
         <ul>
-          {messages?.map((m) => (
+          {shown.map((m) => (
             <li key={m.key}>
-              <button type="button" className="email-row" data-unread={!m.seen} aria-current={open?.key === m.key ? "true" : undefined} onClick={() => void read(m)}>
-                <span className="email-from">{m.flagged ? <Star size={12} aria-hidden="true" /> : null}{m.from}</span>
+              <button type="button" className="email-row" data-unread={!m.seen} data-category={categoryOf(m)} aria-current={open?.key === m.key ? "true" : undefined} onClick={() => void read(m)}>
+                <span className="email-avatar" aria-hidden="true">{initial(m.from)}</span>
+                <span className="email-top">
+                  <span className="email-from">{m.flagged ? <Star size={12} aria-hidden="true" /> : null}{senderName(m.from)}</span>
+                  <span className="email-when">{shortDate(m.date, language)}</span>
+                </span>
                 <span className="email-subject">{m.subject}</span>
                 <span className="email-tags">
                   {m.triage ? <i className="hub-badge" data-triage={m.triage}>{t.triage[m.triage] ?? m.triage}</i> : null}
@@ -142,14 +187,19 @@ function Inbox({account, onDraft}: {account: string; onDraft: () => void}) {
         {!open ? <p className="hub-meta">{busy === "read" ? t.loading : t.selectMessage}</p> : (
           <>
             <h2>{open.subject}</h2>
+            <div className="email-sender" data-category={categoryOf(open)}>
+              <span className="email-avatar big" aria-hidden="true">{initial(open.from)}</span>
+              <div className="email-sender-text"><b>{senderName(open.from)}</b><span>{senderAddress(open.from)}</span></div>
+            </div>
             <dl className="email-meta"><dt>{t.from}</dt><dd>{open.from}</dd><dt>{t.to}</dt><dd>{open.to}</dd><dt>{t.date2}</dt><dd>{open.date}</dd></dl>
             <p className="hub-note email-warning">{t.untrustedNote}</p>
-            <pre className="email-body" aria-label={t.emailTitle}>{open.text}</pre>
+            {open.html ? <MailBody html={open.html} /> : <pre className="email-body" aria-label={t.emailTitle}>{open.text}</pre>}
+            <Attachments files={open.attachments ?? []} />
             {open.summary ? <div className="email-summary"><b>{t.summary}</b><p>{open.summary}</p></div> : null}
             <div className="hub-actions">
               <button type="button" onClick={() => void summarize()} disabled={busy !== null}><Sparkles size={14} aria-hidden="true" />{busy === "summary" ? t.working : t.summarize}</button>
               <button type="button" onClick={() => void mark({seen: true})} disabled={busy !== null}>{t.markSeen}</button>
-              <button type="button" onClick={() => void mark({flagged: !(messages?.find((m) => m.key === open.key)?.flagged)})} disabled={busy !== null}><Star size={14} aria-hidden="true" />{messages?.find((m) => m.key === open.key)?.flagged ? t.unflag : t.flag}</button>
+              <button type="button" onClick={() => void mark({flagged: !current?.flagged})} disabled={busy !== null}><Star size={14} aria-hidden="true" />{current?.flagged ? t.unflag : t.flag}</button>
               <button type="button" onClick={() => setReminding((v) => !v)}><Bell size={14} aria-hidden="true" />{t.remindMe}</button>
             </div>
             {reminding ? <Reminder account={account} uid={open.uid} onDone={() => setReminding(false)} /> : null}

@@ -1,4 +1,4 @@
-import { Activity, BookOpen, Bot, KeyRound, Boxes, Download, Flame, FolderInput, Palette, Plug, Search, Store, UserRound, X, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, Bot, Brain, Gauge, KeyRound, Boxes, Download, Flame, FolderInput, Palette, Plug, Search, Store, UserRound, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { copy, LANGUAGES, type Language } from "../copy";
 import { COMMAND_IDS, comboFromEvent, displayCombo, findConflict, type CommandId } from "../settings/keybindings";
@@ -8,6 +8,8 @@ import { ImportPage } from "./ImportPage";
 import { ChatgptAccount } from "./ChatgptAccount";
 import { ExtensionsPage } from "./ExtensionsPage";
 import { ModelsPage } from "./ModelsPage";
+import { LimitsPage } from "./LimitsPage";
+import { MemoryPage } from "./MemoryPage";
 import { MarketPage } from "./MarketPage";
 import { AgentsPage } from "./AgentsPage";
 import { RegistryPage } from "./RegistryPage";
@@ -114,6 +116,8 @@ export function SettingsPage({ onClose, onRestartService }: { onClose: () => voi
       { id: "agents" as const, title: copy.agents.tab, keywords: ["ACP", "Claude", "Codex", "providers", "API"] },
       { id: "acp-market" as const, title: "ACP Marketplace", keywords: ["registry", "agents", "discover", "install"] },
       { id: "account" as const, title: copy.chatgpt.title, keywords: ["authentication", "login", "OAuth"] },
+      { id: "memory" as const, title: ro ? "Memorie" : "Memory", keywords: ["about me", "facts", "remember", "profile", "preferences", "despre mine", "reține", "profil"] },
+      { id: "limits" as const, title: ro ? "Limite" : "Limits", keywords: ["usage", "quota", "subscription", "weekly", "session", "Claude", "Codex", "utilizare", "cotă"] },
     ] },
     { title: ro ? "SERVICII" : "SERVICES", pages: [
       { id: "accounts" as const, title: hubCopy().accountsTitle, keywords: ["email", "IMAP", "calendar", "CalDAV", "Telegram", "search", "Brave", "password"] },
@@ -135,7 +139,7 @@ export function SettingsPage({ onClose, onRestartService }: { onClose: () => voi
   const icons: Record<typeof page, LucideIcon> = {
     general: Palette, agents: Bot, account: UserRound, models: Boxes,
     import: FolderInput, market: Plug, extensions: Download,
-    "acp-market": Store, "mcp-market": Store, "mcp-installed":Plug, skills: BookOpen, accounts: KeyRound, status: Activity,
+    "acp-market": Store, "mcp-market": Store, "mcp-installed":Plug, skills: BookOpen, accounts: KeyRound, status: Activity, limits: Gauge, memory: Brain,
   };
 
   useEffect(() => {
@@ -188,7 +192,7 @@ export function SettingsPage({ onClose, onRestartService }: { onClose: () => voi
           </nav>
           <div className="settings-body" id="settings-content" role="region" aria-label={pageTitle} key={page} tabIndex={0}>
           <h2 className="settings-page-title">{pageTitle}</h2>
-          {page === "status" ? <StatusPage /> : page === "accounts" ? <AccountsPage /> : page === "mcp-installed" ? <InstalledMcpPage /> : page === "skills" ? <SkillsPage /> : page === "acp-market" ? <RegistryPage ecosystem="acp" /> : page === "mcp-market" ? <McpMarketPage onManage={() => setPage("mcp-installed")} /> : page === "agents" ? <AgentsPage /> : page === "account" ? <ChatgptAccount /> : page === "import" ? <ImportPage onMarket={() => setPage("market")} /> : page === "market" ? <MarketPage onManage={() => setPage("extensions")} /> : page === "extensions" ? <ExtensionsPage /> : page === "models" ? <ModelsPage /> : <>
+          {page === "memory" ? <MemoryPage /> : page === "limits" ? <LimitsPage /> : page === "status" ? <StatusPage /> : page === "accounts" ? <AccountsPage /> : page === "mcp-installed" ? <InstalledMcpPage /> : page === "skills" ? <SkillsPage /> : page === "acp-market" ? <RegistryPage ecosystem="acp" /> : page === "mcp-market" ? <McpMarketPage onManage={() => setPage("mcp-installed")} /> : page === "agents" ? <AgentsPage /> : page === "account" ? <ChatgptAccount /> : page === "import" ? <ImportPage onMarket={() => setPage("market")} /> : page === "market" ? <MarketPage onManage={() => setPage("extensions")} /> : page === "extensions" ? <ExtensionsPage /> : page === "models" ? <ModelsPage /> : <>
           <section>
             <h3>{copy.appearance}</h3>
             <Row label={copy.language}>

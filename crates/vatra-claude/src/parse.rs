@@ -101,7 +101,10 @@ fn parse_init(value: &Value) -> Vec<Parsed> {
 
 fn parse_rate_limit(value: &Value) -> Option<Event> {
     let info = &value["rate_limit_info"];
-    Some(Event::RateLimit { status: info["status"].as_str()?.into(), resets_at: info["resetsAt"].as_i64() })
+    let windows = info["unifiedWindows"].as_object().into_iter().flatten().filter_map(|(name, window)| {
+        Some(vatra_core::LimitWindow { name: name.clone(), used: window["utilization"].as_f64()?.clamp(0.0, 1.0), resets_at: window["resetsAt"].as_i64() })
+    }).collect();
+    Some(Event::RateLimit { status: info["status"].as_str()?.into(), resets_at: info["resetsAt"].as_i64(), windows })
 }
 
 fn parse_result(value: &Value, line: &str) -> Vec<Parsed> {

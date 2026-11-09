@@ -16,7 +16,26 @@ pub struct Parsed {
     pub message_id: String,
     pub references: String,
     pub text: String,
+    /// The HTML version of the body, with embedded pictures filled in. It is untrusted: the app cleans it before showing it.
+    pub html: String,
+    pub attachments: Vec<Attachment>,
+    /// One of `primary`, `promotions`, `social`, `updates`, `forums`.
+    pub category: String,
 }
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Attachment {
+    pub name: String,
+    pub kind: String,
+    pub size: usize,
+    /// A `data:` address for a picture small enough to show in the message.
+    pub preview: Option<String>,
+}
+
+const MAX_HTML_CHARS: usize = 1_500_000;
+const MAX_PART_BYTES: usize = 12_000_000;
+const MAX_PREVIEW_BYTES: usize = 4_000_000;
+const MAX_MEDIA_BYTES: usize = 16_000_000;
 
 /// Header lines, names in lower case, folded lines joined.
 pub fn headers(block: &[u8]) -> Vec<(String, String)> {
@@ -185,55 +204,161 @@ fn strip_html(html: &str) -> String {
         text.push(ch);
         i += ch.len_utf8();
     }
-    text.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+    decode_entities(&text)
 }
 
-fn body_text(head: &[(String, String)], body: &[u8], depth: usize) -> Option<(String, bool)> {
+/// `&amp;`, `&nbsp;`, `&#8211;` and `&#x2013;` become the characters they stand for; unknown names stay as written.
+pub fn decode_entities(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('&') {
+        out.push_str(&rest[..start]);
+        let tail = &rest[start + 1..];
+        let decoded = tail.find(';').filter(|end| *end <= 10).and_then(|end| {
+            let name = &tail[..end];
+            let ch = if let Some(num) = name.strip_prefix('#') {
+                let code = match num.strip_prefix(['x', 'X']) {
+                    Some(hex) => u32::from_str_radix(hex, 16).ok(),
+                    None => num.parse().ok(),
+                };
+                code.and_then(char::from_u32)
+            } else {
+                match name {
+                    "nbsp" => Some(' '),
+                    "lt" => Some('<'),
+                    "gt" => Some('>'),
+                    "quot" => Some('"'),
+                    "amp" => Some('&'),
+                    "apos" => Some('\''),
+                    "zwnj" => Some('\u{200C}'),
+                    "zwj" => Some('\u{200D}'),
+                    "hellip" => Some('\u{2026}'),
+                    "ndash" => Some('\u{2013}'),
+                    "mdash" => Some('\u{2014}'),
+                    "lsquo" => Some('\u{2018}'),
+                    "rsquo" => Some('\u{2019}'),
+                    "ldquo" => Some('\u{201C}'),
+                    "rdquo" => Some('\u{201D}'),
+                    "bull" => Some('\u{2022}'),
+                    "copy" => Some('\u{A9}'),
+                    "reg" => Some('\u{AE}'),
+                    "trade" => Some('\u{2122}'),
+                    "euro" => Some('\u{20AC}'),
+                    _ => None,
+                }
+            };
+            ch.map(|c| (c, end))
+        });
+        match decoded {
+            Some((c, end)) => {
+                out.push(c);
+                rest = &tail[end + 1..];
+            }
+            None => {
+                out.push('&');
+                rest = tail;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+#[derive(Default)]
+struct Found {
+    plain: Option<String>,
+    html: Option<String>,
+    inline: Vec<(String, String, Vec<u8>)>,
+    files: Vec<(String, String, Vec<u8>, usize)>,
+    media_bytes: usize,
+}
+
+fn decode_body(head: &[(String, String)], body: &[u8]) -> Option<Vec<u8>> {
+    if body.len() > MAX_PART_BYTES * 2 {
+        return None;
+    }
+    match header(head, "content-transfer-encoding").to_ascii_lowercase().as_str() {
+        "base64" => {
+            let clean: Vec<u8> = body.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect();
+            base64::engine::general_purpose::STANDARD.decode(clean).ok()
+        }
+        "quoted-printable" => Some(qp_decode(body)),
+        _ => Some(body.to_vec()),
+    }
+}
+
+fn walk(head: &[(String, String)], body: &[u8], depth: usize, found: &mut Found) {
     let content_type = header(head, "content-type");
     let kind = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
     let kind = if kind.is_empty() { "text/plain".to_string() } else { kind };
     if kind.starts_with("multipart/") {
+        let Some(boundary) = param(content_type, "boundary") else { return };
         if depth >= MAX_DEPTH {
-            return None;
+            return;
         }
-        let boundary = param(content_type, "boundary")?;
         let marker = format!("--{boundary}");
         let text = String::from_utf8_lossy(body).into_owned();
-        let mut plain: Option<String> = None;
-        let mut html: Option<String> = None;
         for part in text.split(&marker).skip(1) {
             if part.starts_with("--") {
                 break;
             }
             let part = part.trim_start_matches(['\r', '\n']);
             let (phead, pbody) = split_head_body(part.as_bytes());
-            let phead = headers(phead);
-            if header(&phead, "content-disposition").to_ascii_lowercase().starts_with("attachment") {
-                continue;
-            }
-            if let Some((found, is_html)) = body_text(&phead, pbody, depth + 1) {
-                if is_html {
-                    html.get_or_insert(found);
-                } else {
-                    plain.get_or_insert(found);
-                }
-            }
+            walk(&headers(phead), pbody, depth + 1, found);
         }
-        return plain.map(|p| (p, false)).or(html.map(|h| (h, true)));
+        return;
     }
-    if !(kind == "text/plain" || kind == "text/html") {
+    let disposition = header(head, "content-disposition");
+    let attached = disposition.to_ascii_lowercase().starts_with("attachment");
+    let name = param(disposition, "filename")
+        .or_else(|| param(content_type, "name"))
+        .map(|n| clean(&decode_words(&n)).replace('\n', " "))
+        .unwrap_or_default();
+    if (kind == "text/plain" || kind == "text/html") && !attached && name.is_empty() {
+        let Some(decoded) = decode_body(head, body) else { return };
+        let text = charset_text(&decoded, &param(content_type, "charset").unwrap_or_else(|| "utf-8".into()));
+        if kind == "text/html" {
+            found.html.get_or_insert(text);
+        } else {
+            found.plain.get_or_insert(text);
+        }
+        return;
+    }
+    if kind.starts_with("message/") {
+        return;
+    }
+    let size = body.len() / 4 * 3;
+    let cid = header(head, "content-id").trim().trim_matches(['<', '>']).to_string();
+    let wants_bytes = kind.starts_with("image/") && size <= MAX_PREVIEW_BYTES && found.media_bytes + size <= MAX_MEDIA_BYTES;
+    let bytes = if wants_bytes { decode_body(head, body) } else { None };
+    let size = bytes.as_ref().map_or(size, Vec::len);
+    if let Some(bytes) = &bytes {
+        found.media_bytes += bytes.len();
+    }
+    if !cid.is_empty() && kind.starts_with("image/") && !attached {
+        if let Some(bytes) = bytes {
+            found.inline.push((cid, kind, bytes));
+        }
+        return;
+    }
+    let shown = if name.is_empty() { "attachment".to_string() } else { name };
+    found.files.push((shown, kind, bytes.unwrap_or_default(), size));
+}
+
+fn data_uri(kind: &str, bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
         return None;
     }
-    let decoded = match header(head, "content-transfer-encoding").to_ascii_lowercase().as_str() {
-        "base64" => {
-            let clean: Vec<u8> = body.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect();
-            base64::engine::general_purpose::STANDARD.decode(clean).ok()?
-        }
-        "quoted-printable" => qp_decode(body),
-        _ => body.to_vec(),
-    };
-    let text = charset_text(&decoded, &param(content_type, "charset").unwrap_or_else(|| "utf-8".into()));
-    Some((text, kind == "text/html"))
+    matches!(kind, "image/png" | "image/jpeg" | "image/jpg" | "image/gif" | "image/webp" | "image/bmp" | "image/avif")
+        .then(|| format!("data:{kind};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+}
+
+/// Keeps new lines and tabs, drops other control characters, and refuses a page too big to show.
+fn clean_html(html: &str) -> String {
+    if html.chars().count() > MAX_HTML_CHARS {
+        return String::new();
+    }
+    html.chars().filter(|c| !c.is_control() || matches!(c, '\n' | '\t' | '\r')).collect()
 }
 
 /// Removes what could hide or rewrite text on screen: control characters (but not new lines or tabs) and the
@@ -256,21 +381,89 @@ pub fn clean(text: &str) -> String {
 pub fn parse_message(bytes: &[u8]) -> Parsed {
     let (head_bytes, body) = split_head_body(bytes);
     let head = headers(head_bytes);
-    let text = match body_text(&head, body, 0) {
-        Some((text, true)) => strip_html(&text),
-        Some((text, false)) => text,
-        None => String::new(),
+    let mut found = Found::default();
+    walk(&head, body, 0, &mut found);
+    let mut html = found.html.clone().unwrap_or_default();
+    for (cid, kind, bytes) in &found.inline {
+        if let Some(uri) = data_uri(kind, bytes) {
+            html = html.replace(&format!("cid:{cid}"), &uri);
+        }
+    }
+    let text = match (&found.plain, &found.html) {
+        (Some(plain), _) => plain.clone(),
+        (None, Some(html)) => strip_html(html),
+        (None, None) => String::new(),
     };
+    let attachments = found
+        .files
+        .into_iter()
+        .take(30)
+        .map(|(name, kind, bytes, size)| Attachment { name, preview: data_uri(&kind, &bytes), kind, size })
+        .collect();
     let single = |name: &str| clean(&decode_words(header(&head, name))).replace('\n', " ");
+    let (from, subject) = (single("from"), single("subject"));
+    let category = categorize(&head, &from, &subject).to_string();
     Parsed {
-        from: single("from"),
+        from,
         to: single("to"),
-        subject: single("subject"),
+        subject,
         date: single("date"),
         message_id: header(&head, "message-id").trim().to_string(),
         references: header(&head, "references").trim().to_string(),
         text: clean(&text),
+        html: clean_html(&html),
+        attachments,
+        category,
     }
+}
+
+/// Which tab of the inbox a message belongs in, decided from how it was sent and what it says, with no model involved.
+pub fn categorize(head: &[(String, String)], from: &str, subject: &str) -> &'static str {
+    let from = from.to_ascii_lowercase();
+    let subject = subject.to_ascii_lowercase();
+    let has = |words: &[&str], text: &str| words.iter().any(|w| text.contains(w));
+    if has(
+        &[
+            "facebookmail", "facebook.com", "linkedin", "twitter.com", "x.com", "instagram", "tiktok", "pinterest", "reddit", "discord", "snapchat", "meetup.com",
+            "tumblr", "quora", "mastodon", "bsky",
+        ],
+        &from,
+    ) {
+        return "social";
+    }
+    let bulk = !header(head, "list-unsubscribe").is_empty() || header(head, "precedence").to_ascii_lowercase().contains("bulk");
+    if !header(head, "list-id").is_empty() && !has(&["marketing", "promo", "offers", "deals"], &from) {
+        return "forums";
+    }
+    let transactional = has(
+        &[
+            "verify", "verif", "confirm", "receipt", "invoice", "order", "refund", "password", "parol", "security", "sign-in", "sign in", "login", "your code",
+            "one-time", "reset", "payment", "plata", "plat\u{103}", "factur", "comand", "livrare", "delivery", "shipped", "tracking", "statement", "alert", "reminder",
+            "booking", "rezerv", "ticket", "bilet", "your account", "ramburs",
+        ],
+        &subject,
+    );
+    let automated = has(
+        &["noreply", "no-reply", "donotreply", "do-not-reply", "notification", "alerts@", "billing", "receipts@", "orders@", "service@", "support@", "security@"],
+        &from,
+    );
+    let promo_subject = has(
+        &[
+            "% off", "sale", "deal", "discount", "offer", "save ", "free ", "coupon", "promo", "newsletter", "reducer", "ofert", "cupon", "premium", "upgrade",
+            "last chance", "ends ", "limited", "new arrivals", "recommended", "insider", "what you earned", "trending", "don't miss", "weekly", "welcome to",
+        ],
+        &subject,
+    ) || has(&["marketing", "promo", "newsletter", "news@", "offers", "deals", "hello@", "insider", "@mail."], &from);
+    if bulk {
+        return if transactional && !promo_subject { "updates" } else { "promotions" };
+    }
+    if promo_subject && !transactional {
+        return "promotions";
+    }
+    if transactional || automated {
+        return "updates";
+    }
+    "primary"
 }
 
 /// An RFC 2047 encoded word for a header that has non-ASCII letters.
@@ -334,5 +527,46 @@ mod tests {
     fn very_long_text_is_cut() {
         let long = "a".repeat(MAX_TEXT_CHARS + 500);
         assert!(clean(&long).ends_with("longer than this.]"));
+    }
+
+    #[test]
+    fn html_body_keeps_markup_and_inlines_embedded_pictures() {
+        let png = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71, 1, 2, 3]);
+        let raw = format!(
+            "Subject: x\r\nContent-Type: multipart/related; boundary=\"R\"\r\n\r\n--R\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Hi</p><img src=\"cid:logo1\">\r\n--R\r\nContent-Type: image/png\r\nContent-ID: <logo1>\r\nContent-Transfer-Encoding: base64\r\n\r\n{png}\r\n--R\r\nContent-Type: application/pdf; name=\"plan.pdf\"\r\nContent-Disposition: attachment; filename=\"plan.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0=\r\n--R--\r\n"
+        );
+        let m = parse_message(raw.as_bytes());
+        assert!(m.html.contains("<p>Hi</p>"));
+        assert!(m.html.contains("src=\"data:image/png;base64,"), "{}", m.html);
+        assert_eq!(m.attachments.len(), 1);
+        assert_eq!(m.attachments[0].name, "plan.pdf");
+        assert!(m.attachments[0].preview.is_none());
+        assert_eq!(m.text, "Hi");
+    }
+
+    #[test]
+    fn an_attached_picture_gets_a_preview() {
+        let png = base64::engine::general_purpose::STANDARD.encode([1u8, 2, 3, 4]);
+        let raw = format!(
+            "Content-Type: multipart/mixed; boundary=\"M\"\r\n\r\n--M\r\nContent-Type: text/plain\r\n\r\nSee photo\r\n--M\r\nContent-Type: image/jpeg; name=\"cat.jpg\"\r\nContent-Disposition: attachment; filename=\"cat.jpg\"\r\nContent-Transfer-Encoding: base64\r\n\r\n{png}\r\n--M--\r\n"
+        );
+        let m = parse_message(raw.as_bytes());
+        assert_eq!(m.attachments[0].name, "cat.jpg");
+        assert!(m.attachments[0].preview.as_deref().is_some_and(|p| p.starts_with("data:image/jpeg;base64,")));
+    }
+
+    #[test]
+    fn entities_are_decoded() {
+        assert_eq!(decode_entities("a&nbsp;&amp;&#8211;&#x2013;&zwnj;b &unknown; &"), "a &\u{2013}\u{2013}\u{200C}b &unknown; &");
+    }
+
+    #[test]
+    fn mail_is_sorted_into_categories() {
+        let cat = |raw: &str| parse_message(raw.as_bytes()).category;
+        assert_eq!(cat("From: Facebook <notification@facebookmail.com>\r\nSubject: Ana wants to connect\r\n\r\nx"), "social");
+        assert_eq!(cat("From: \"Marvel Insider\" <marvel@mail.marvel.com>\r\nSubject: See what you earned\r\nList-Unsubscribe: <mailto:u@x>\r\n\r\nx"), "promotions");
+        assert_eq!(cat("From: JustWatch <noreply@justwatch.com>\r\nSubject: Verify your email\r\n\r\nx"), "updates");
+        assert_eq!(cat("From: Rust list <users@lists.rust-lang.org>\r\nSubject: Question\r\nList-Id: <users.lists>\r\n\r\nx"), "forums");
+        assert_eq!(cat("From: Ioana <ioana@example.com>\r\nSubject: Cina diseara?\r\n\r\nx"), "primary");
     }
 }

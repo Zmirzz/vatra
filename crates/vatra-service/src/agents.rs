@@ -131,6 +131,10 @@ pub trait AgentFactory: Send + Sync {
     async fn agent_options(&self, _name: &str, _project_id: i64, _model: Option<&str>) -> Result<serde_json::Value, String> {
         Err("This agent doesn't list models".into())
     }
+    /// What an ACP agent prints for one of its own slash commands, such as `/status`. No model runs.
+    async fn agent_command(&self, _name: &str, _command: &str) -> Result<String, String> {
+        Err("This agent can't run commands".into())
+    }
     fn chatgpt(&self) -> Option<Arc<crate::chatgpt::ChatGptAuth>> {
         None
     }
@@ -722,6 +726,7 @@ impl ConfigAgents {
             preamble.push_str("\n\n");
             preamble.push_str(vatra_engine::WEB_VERIFICATION);
         }
+        self.add_profile(&mut preamble);
         if !problems.is_empty() {
             preamble.push_str(&format!("\nExtension notices:\n{}", problems.join("\n")));
         }
@@ -746,6 +751,20 @@ impl ConfigAgents {
             model: request.options.model.clone(),
             effort: request.options.effort.clone(),
         })
+    }
+
+    /// What every agent knows about the person. Claude and ACP agents save to it through the bridge's `remember` tool,
+    /// so their instructions only carry it when the bridge is there to take new facts.
+    fn add_profile(&self, text: &mut String) {
+        if self.bridge.is_none() {
+            return;
+        }
+        if let Some(profile) = self.store.as_ref().and_then(|store| store.user_memory_prompt()) {
+            if !text.is_empty() {
+                text.push_str("\n\n");
+            }
+            text.push_str(&profile);
+        }
     }
 
     fn entries_for(&self, project: i64) -> Vec<vatra_extensions::CatalogEntry> {
@@ -893,6 +912,8 @@ impl ConfigAgents {
     /// The folder the agents of a project work in. Its MCP servers see it as `${CLAUDE_PROJECT_DIR}`.
     fn project_dir(&self, request: &BuildRequest) -> Result<PathBuf, String> {
         if request.project_id == 0 {
+            // Asking an agent what it offers (the model picker) has no conversation yet and runs nothing.
+            if request.session_id == 0 { return project_workspace(&self.data_dir(),0).map_err(|e|e.to_string()); }
             return session_workspace(&self.data_dir(),request.session_id).map_err(|e|e.to_string());
         }
         match (&request.cwd, &self.bridge) {
@@ -939,6 +960,7 @@ impl ConfigAgents {
         let mut registry = self.registry(&driver, &hub);
         if let Some(store) = &self.store {
             registry.register(vatra_engine::search_history_tool(Arc::clone(store)));
+            for tool in vatra_engine::user_memory_tools(Arc::clone(store), request.name.clone()) { registry.register(tool); }
             // Search by meaning, when the person has an embedding account. In a workspace turn it stays in that project.
             if let Some(embedder) = crate::semantic::embedder(store, self.secrets().as_ref()) {
                 let project = store.workspace_turn_context(request.session_id).ok().flatten().map(|scope| scope.project_id);
@@ -1007,6 +1029,7 @@ impl ConfigAgents {
             audit: self.store.clone(),
             session_id: Some(request.session_id),
         })
+        .with_profile(self.store.as_ref().and_then(|store| store.user_memory_prompt()))
         .with_effort(effort))
     }
 }
@@ -1132,6 +1155,7 @@ impl AgentFactory for ConfigAgents {
                     context.push_str("\n\n");
                     context.push_str(vatra_engine::WEB_VERIFICATION);
                 }
+                self.add_profile(&mut context);
                 extras.append_prompt = (!context.is_empty()).then_some(context);
                 let mut servers =
                     self.external_servers(extras.servers.clone(), &request, &active)?;
@@ -1395,6 +1419,18 @@ impl AgentFactory for ConfigAgents {
         };
         let config = self.acp_ready_config(&request).await?;
         serde_json::to_value(vatra_acp::probe_options(&config).await?).map_err(|_| "Could not read agent options".into())
+    }
+    async fn agent_command(&self, name: &str, command: &str) -> Result<String, String> {
+        if !matches!(self.find(name)?, AgentConfig::Acp { .. }) {
+            return Err("This agent can't run commands".into());
+        }
+        let request = BuildRequest {
+            name: name.into(), session_id: 0, project_id: 0,
+            approver: Arc::new(vatra_engine::DenyAll), questioner: Arc::new(vatra_engine::NoQuestions),
+            mode: PermissionMode::Supervised, cwd: None, options: TurnOptions::default(),
+        };
+        let config = self.acp_ready_config(&request).await?;
+        vatra_acp::probe_command(&config, command).await
     }
     fn picker_identity(&self, name: &str) -> Option<(String, Option<String>)> {
         match self.find(name).ok()? {

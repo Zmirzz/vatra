@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+/// One usage window of a subscription: `used` is a fraction from 0 to 1.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LimitWindow {
+    pub name: String,
+    pub used: f64,
+    pub resets_at: Option<i64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HandoffBrief {
     pub summary: String,
@@ -39,7 +47,13 @@ pub enum Event {
     SubagentFinished { id: String, status: String },
     Hook { name: String, phase: String, output: Option<String> },
     Usage { input_tokens: u64, output_tokens: u64, cost_usd: Option<f64> },
-    RateLimit { status: String, resets_at: Option<i64> },
+    RateLimit {
+        status: String,
+        resets_at: Option<i64>,
+        /// How much of each window (five hours, a week) is used, when the agent says.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        windows: Vec<LimitWindow>,
+    },
     Catalog { skills: u32, agents: u32, plugins: u32, mcp_servers: u32 },
     /// Stands in for the history before it. Its position in the journal marks the cut-off.
     Compacted { summary: String },

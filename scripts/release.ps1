@@ -11,6 +11,15 @@ $tag = "v$version"
 $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=~ --remap-path-prefix=$root=src"
 $env:CFLAGS = "/d1trimfile:$env:USERPROFILE\"
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -LiteralPath $keyFile -Raw
+# Sign-in IDs for Google and Microsoft are compiled in, so people never see a developer console. They live in a private
+# file outside the repository, one NAME=value per line: VATRA_GOOGLE_CLIENT_ID, VATRA_GOOGLE_CLIENT_SECRET, VATRA_MICROSOFT_CLIENT_ID.
+$oauthFile = Join-Path $env:USERPROFILE '.vatra-release\oauth.env'
+$oauthNames = @()
+if (Test-Path $oauthFile) {
+  foreach ($line in Get-Content -LiteralPath $oauthFile) {
+    if ($line -match '^\s*(VATRA_(?:GOOGLE|MICROSOFT)_CLIENT_(?:ID|SECRET))\s*=\s*(.+?)\s*$') { Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]; $oauthNames += $Matches[1] }
+  }
+} else { Write-Host "No ${oauthFile}: this build asks people for their own sign-in ID." }
 try {
   Push-Location (Join-Path $root 'apps\desktop')
   npm run build:desktop
@@ -19,6 +28,7 @@ try {
   Pop-Location
   Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
   Remove-Item Env:RUSTFLAGS,Env:CFLAGS -ErrorAction SilentlyContinue
+  foreach ($name in $oauthNames) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
 $dir = Join-Path $root 'target\release\bundle\nsis'
 $exe = Join-Path $dir "Vatra_${version}_x64-setup.exe"

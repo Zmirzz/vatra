@@ -101,6 +101,57 @@ describe("email", () => {
     expect(container.querySelector(".email-body script")).toBeNull();
   });
 
+  it("shows an HTML message in a locked frame, holds back web pictures until asked, and never keeps scripts", async () => {
+    const fake = setup();
+    fake.results["email.accounts"] = [{id: "e1", name: "Personal", address: "eu@x.ro"}];
+    fake.results["email.list"] = {messages: [{...header, subject: "Oferta"}], has_more: false, next_before: null};
+    fake.results["email.read"] = {
+      ...message, subject: "Oferta", text: "Oferta",
+      html: '<p style="background:url(https://t.example/a.png)">Salut</p><script>alert(1)</script><img src="https://cdn.example/logo.png"><img src="data:image/png;base64,AAAA"><a href="javascript:alert(2)">x</a>',
+      attachments: [{name: "plan.pdf", type: "application/pdf", size: 2048, preview: null}, {name: "poza.jpg", type: "image/jpeg", size: 10, preview: "data:image/jpeg;base64,AAAA"}],
+    };
+    fake.results["email.images"] = {images: {"https://cdn.example/logo.png": "data:image/png;base64,BBBB"}};
+    const {container} = view(fake, <EmailPage onOpenSettings={() => undefined} />);
+    await userEvent.click(await screen.findByRole("button", {name: /Oferta/}));
+    const frame = (await waitFor(() => { const f = container.querySelector("iframe.mail-frame"); if (!f) throw new Error("no frame"); return f; })) as HTMLIFrameElement;
+    expect(frame.getAttribute("sandbox")).toBe("allow-same-origin");
+    const doc = frame.getAttribute("srcdoc") ?? "";
+    expect(doc).toContain("Salut");
+    expect(doc).not.toMatch(/<script|alert\(1\)|javascript:|t\.example|cdn\.example/);
+    expect(doc).toContain("data:image/png;base64,AAAA");
+    expect(doc).toContain("default-src 'none'");
+    expect(screen.getByText(/Pictures are hidden/)).toBeTruthy();
+    expect(screen.getByText("plan.pdf")).toBeTruthy();
+    expect(container.querySelector(".mail-pictures img")?.getAttribute("alt")).toBe("poza.jpg");
+    await userEvent.click(screen.getByRole("button", {name: "Show pictures"}));
+    await waitFor(() => expect(fake.calls("email.images")).toEqual([{urls: ["https://cdn.example/logo.png"]}]));
+    await waitFor(() => expect(container.querySelector("iframe.mail-frame")?.getAttribute("srcdoc")).toContain("data:image/png;base64,BBBB"));
+    expect(screen.queryByText(/Pictures are hidden/)).toBeNull();
+  });
+
+  it("sorts the inbox into category tabs and can search and show only unread", async () => {
+    const fake = setup();
+    const mail = (uid: number, from: string, subject: string, category: string, seen = false) => ({...header, uid, key: `<k${uid}@x>`, from, subject, category, seen});
+    fake.results["email.accounts"] = [{id: "e1", name: "Personal", address: "eu@x.ro"}];
+    fake.results["email.list"] = {
+      messages: [mail(1, "Ana <ana@x.ro>", "Cina diseara", "primary"), mail(2, "Shop <hi@shop.com>", "50% reducere", "promotions"), mail(3, "Facebook <n@facebookmail.com>", "Ana ti-a scris", "social", true)],
+      has_more: false, next_before: null,
+    };
+    view(fake, <EmailPage onOpenSettings={() => undefined} />);
+    await screen.findByText("Cina diseara");
+    expect(screen.getAllByRole("tab", {name: /Promotions|Social|Updates|Forums|Primary|All/}).length).toBe(6);
+    await userEvent.click(screen.getByRole("tab", {name: /Promotions/}));
+    expect(screen.queryByText("Cina diseara")).toBeNull();
+    expect(screen.getByText("50% reducere")).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", {name: /^All/}));
+    await userEvent.click(screen.getByRole("button", {name: "Unread"}));
+    expect(screen.queryByText("Ana ti-a scris")).toBeNull();
+    expect(screen.getByText("Cina diseara")).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Search mail"), "reducere");
+    expect(screen.queryByText("Cina diseara")).toBeNull();
+    expect(screen.getByText("50% reducere")).toBeTruthy();
+  });
+
   it("sends a draft only after a confirmation that shows exactly what goes out", async () => {
     const fake = setup();
     fake.results["email.accounts"] = [{id: "e1", name: "Personal"}];
@@ -275,6 +326,8 @@ describe("signing in with Google or Microsoft", () => {
     view(fake, <AccountsPage />);
     await userEvent.click(await screen.findByRole("button", {name: /^Email/}));
     await userEvent.click(await screen.findByRole("button", {name: "Sign in with Google"}));
+    expect(await screen.findByText(/isn't available in this version yet/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", {name: "I have my own sign-in ID"}));
     await userEvent.type(screen.getByLabelText("Client ID"), "abc.apps.googleusercontent.com");
     await userEvent.click(screen.getByRole("button", {name: "Save the ID"}));
     await waitFor(() => expect(fake.calls("oauth.configure")).toHaveLength(1));

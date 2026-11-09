@@ -125,6 +125,42 @@ pub async fn probe_options(config: &AcpConfig) -> Result<AcpOptions, String> {
     result.map_err(|error| error.to_string())
 }
 
+/// Starts the agent just long enough to run one of its own slash commands (like `/status`) and returns what it printed.
+/// The command is answered by the agent itself, so no model runs.
+pub async fn probe_command(config: &AcpConfig, command: &str) -> Result<String, String> {
+    let mut connection = Connection::spawn(config).map_err(|error| error.to_string())?;
+    let (sink, mut received) = tokio::sync::mpsc::unbounded_channel();
+    let mut updates = Updates::new(config.commands.clone());
+    let mut clock = Clock::new(config.startup_timeout);
+    let permissions = DenyAll;
+    let init = json!({"protocolVersion":1,"clientInfo":{"name":"vatra","version":env!("CARGO_PKG_VERSION")},"clientCapabilities":{}});
+    let new = json!({"cwd":config.cwd.to_string_lossy(),"mcpServers":[]});
+    let result = async {
+        rpc(&mut connection, 1, "initialize", init, &permissions, &sink, &mut updates, &mut clock, false).await?;
+        let response = rpc(&mut connection, 2, "session/new", new, &permissions, &sink, &mut updates, &mut clock, false).await?;
+        let session = response["sessionId"].as_str().ok_or_else(|| failed("The agent didn't return a session"))?;
+        connection.session = Some(session.to_string());
+        let prompt = json!({"sessionId":session,"prompt":[{"type":"text","text":command}]});
+        rpc(&mut connection, 3, "session/prompt", prompt, &permissions, &sink, &mut updates, &mut clock, true).await?;
+        Ok::<_, AgentError>(())
+    }
+    .await;
+    updates.flush(&sink);
+    let _ = connection.tree.kill_all();
+    let _ = connection.child.start_kill();
+    let _ = timeout(Duration::from_secs(2), connection.child.wait()).await;
+    result.map_err(|error| error.to_string())?;
+    let mut text = String::new();
+    while let Ok(event) = received.try_recv() {
+        match event {
+            Event::AssistantText { text: part } => { text.clear(); text.push_str(&part); }
+            Event::AssistantDelta { text: part } => text.push_str(&part),
+            _ => {}
+        }
+    }
+    Ok(text)
+}
+
 /// Sets the model and effort a person picked, through the settings the agent listed. A choice the agent can't take
 /// stops the turn before any prompt is sent.
 #[allow(clippy::too_many_arguments)]
