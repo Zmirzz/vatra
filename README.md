@@ -35,6 +35,9 @@ For a development run, start the service with `cargo run -p vatra-cli -- serve` 
 in `apps/desktop`. Copy `vatra.example.toml` to `vatra.toml` to configure agents by hand. See `docs/` for the
 ACP notes, the security model and the release process.
 
+Debug/test builds use reduced disk space. See [build cache cleanup](docs/cleanup.md)
+for manual cleanup and the optional daily Windows cleanup task.
+
 ## License
 
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

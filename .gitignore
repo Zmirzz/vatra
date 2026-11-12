@@ -7,3 +7,5 @@ dist/
 apps/desktop/src-tauri/binaries/
 apps/desktop/src-tauri/gen/
 apps/desktop/public/pdfjs/
+.cleanup.lock
+.cleanup.log
