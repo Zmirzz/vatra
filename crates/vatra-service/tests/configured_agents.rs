@@ -184,6 +184,27 @@ fn an_old_key_does_not_follow_the_agent_to_a_new_address() {
     check_save(&store, &secrets, &[], &moved, new_key.as_deref()).unwrap();
 }
 
+#[test]
+fn a_hosted_service_needs_a_key_and_a_local_one_does_not() {
+    let store = Store::open_in_memory().unwrap();
+    let secrets = MemorySecretStore::default();
+    let anthropic = |key: Option<&str>| AgentForm::Model {
+        name: "anthropic".into(), provider: "anthropic".into(), base_url: None, model: "claude-haiku-5-5".into(), key: key.map(Into::into),
+    };
+    let (row, none) = agent_from_form(anthropic(None), 1).unwrap();
+    let error = check_save(&store, &secrets, &[], &row, none.as_deref()).unwrap_err();
+    assert!(error.contains("key"), "{error}");
+    let (row, key) = agent_from_form(anthropic(Some("sk-ant")), 2).unwrap();
+    check_save(&store, &secrets, &[], &row, key.as_deref()).unwrap();
+    save(&store, &secrets, &row, key.as_deref()).unwrap();
+    // Saved once with a key, it can be saved again without typing it.
+    let (again, none) = agent_from_form(anthropic(None), 3).unwrap();
+    check_save(&store, &secrets, &[], &again, none.as_deref()).unwrap();
+    let ollama = AgentForm::Model { name: "ollama".into(), provider: "ollama".into(), base_url: None, model: "qwen".into(), key: None };
+    let (row, none) = agent_from_form(ollama, 4).unwrap();
+    check_save(&store, &secrets, &[], &row, none.as_deref()).unwrap();
+}
+
 fn codex_form(managed: bool, codex: Option<&str>) -> AgentForm {
     AgentForm::Acp {
         name: "codex".into(),

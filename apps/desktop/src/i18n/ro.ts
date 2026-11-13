@@ -66,7 +66,7 @@ export const ro: Strings = {
     openImport: "Alege ce aduci",
     stepModel: "Alege un model",
     modelBody: "Rulează unul pe acest calculator, gratuit și privat, sau folosește un model online cu o cheie.",
-    local: "Pe acest calculator", localHelp: "Gratuit și privat. Cere o descărcare.", online: "Online, cu o cheie", onlineHelp: "Folosește un serviciu pe care îl plătești deja sau unul gratuit.",
+    local: "Pe acest calculator", localHelp: "Gratuit și privat. Cere o descărcare.", online: "Online", onlineHelp: "Abonamentul tău Claude sau ChatGPT, ori un serviciu cu cheie.",
     noSuggestion: "Vatra n-a putut încărca sugestiile. Poți alege un model mai târziu din Setări, Modele.",
     downloading: "Se descarcă {name}…",
     stepTools: "Conectează-ți uneltele",

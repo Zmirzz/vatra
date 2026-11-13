@@ -871,6 +871,7 @@ impl Service {
         let catalog = self.agents.catalog();
         let store = Arc::clone(&self.store);
         let dirs = self.source_dirs.clone();
+        let started = std::time::Instant::now();
         let (scanned, projects) = tokio::task::spawn_blocking(move || {
             let folders =
                 crate::import::project_folders(&store, &dirs).map_err(ServiceError::Import)?;
@@ -879,7 +880,16 @@ impl Service {
         })
         .await
         .map_err(|error| ServiceError::Import(error.to_string()))??;
+        let read = started.elapsed();
         let mut probes = probe_items(&SystemProbe::new(), &scanned.items).await;
+        // A slow scan on someone's computer is otherwise a mystery: the log says which part took the time.
+        eprintln!(
+            "import scan: {} folders and {} items read in {:.1}s, programs checked in {:.1}s",
+            projects.len(),
+            scanned.items.len(),
+            read.as_secs_f64(),
+            (started.elapsed() - read).as_secs_f64(),
+        );
         probes.approved =
             approvals(&scanned, &projects, catalog.as_deref()).map_err(ServiceError::Import)?;
         scan_view(&scanned, &projects, catalog.as_deref(), &probes).map_err(ServiceError::Import)
@@ -996,8 +1006,16 @@ impl Service {
         let store = Arc::clone(&self.store);
         let dirs = self.source_dirs.clone();
         tokio::task::spawn_blocking(move || {
+            let started = std::time::Instant::now();
             let projects = store.list_projects()?;
-            Ok::<_, ServiceError>(vatra_import::history_projects(&dirs, &projects))
+            let found = vatra_import::history_projects(&dirs, &projects);
+            let conversations: usize = found.iter().map(|project| project.conversations).sum();
+            eprintln!(
+                "import history: {conversations} conversations in {} folders read in {:.1}s",
+                found.len(),
+                started.elapsed().as_secs_f64(),
+            );
+            Ok::<_, ServiceError>(found)
         })
         .await
         .map_err(|error| ServiceError::Import(error.to_string()))?
