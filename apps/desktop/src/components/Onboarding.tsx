@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { copy } from "../copy";
 import { useClient } from "../rpc/context";
-import type { DetectedAgents, HardwareReport, LlamaStatus, ModelDownloadNotice, Suggestion } from "../rpc/types";
+import type { AgentKind, DetectedAgents, HardwareReport, LlamaStatus, ModelDownloadNotice, Suggestion } from "../rpc/types";
 import { openSession, refreshSessions, useAppStore } from "../state/store";
 import { AgentForm } from "./AgentForm";
 import { DependencyDialog } from "./DependencyDialog";
@@ -89,6 +89,8 @@ export function Onboarding({ sources, onDone }: { sources: boolean; onDone: () =
       next();
     } catch (caught) { setError((caught as Error).message); }
   };
+  // A subscription the person already signed in to comes first; a key is the fallback, not the only way online.
+  const onlineKinds: AgentKind[] = detected?.claude ? ["claude", "acp", "model"] : detected?.codex ? ["acp", "claude", "model"] : ["model", "claude", "acp"];
   const gpu = hardware?.gpus.find((candidate) => !candidate.integrated);
   const found = (label: string, present: boolean) => <li data-found={present}>
     <span>{label}</span><span className="help">{present ? copy.onboarding.found : copy.onboarding.missing}</span>
@@ -142,7 +144,7 @@ export function Onboarding({ sources, onDone }: { sources: boolean; onDone: () =
                 <button type="button" onClick={() => setConfirmDownload(false)}>{copy.models.cancel}</button>
               </div> : null}
             </>}
-          </div> : <AgentForm kinds={["model"]} onSaved={() => {
+          </div> : <AgentForm key={onlineKinds.join()} kinds={onlineKinds} onSaved={() => {
             // The service reads new agents when it starts again; nothing is running yet during setup.
             client.call("service.shutdown", {}).catch(() => undefined);
             next();

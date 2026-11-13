@@ -30,6 +30,14 @@ export function ImportPage({ onMarket }: { onMarket?: () => void }) {
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => client.on((notice) => { if (notice.method === "import_progress") setProgress(notice.params); }), [client]);
+  // A search that runs past a minute is stuck or very slow; say so, so the person isn't left looking at a spinner.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (busy !== "scan") return;
+    const timer = setTimeout(() => setSlow(true), 60_000);
+    return () => clearTimeout(timer);
+  }, [busy]);
 
   const find = async () => {
     setBusy("scan"); setError(null); setProgress(null); setResult(null); setVariants({}); setPicked(new Set());
@@ -126,7 +134,7 @@ export function ImportPage({ onMarket }: { onMarket?: () => void }) {
     <section className="transfer-page import-page">
       <h3>{copy.bringOver.title}</h3>
       <p className="help">{copy.bringOver.intro}</p>
-      {busy === "scan" ? <p role="status">{copy.bringOver.looking}</p> : null}
+      {busy === "scan" ? <p role="status">{slow ? copy.bringOver.slow : copy.bringOver.looking}</p> : null}
       {error ? <p role="alert">{copy.transfer.failed} {error}</p> : null}
       {scan && history ? (
         <>

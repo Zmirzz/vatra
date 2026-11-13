@@ -64,7 +64,7 @@ export const en = {
     openImport: "Choose what to bring",
     stepModel: "Choose a model",
     modelBody: "Run one on this computer, free and private, or use an online model with a key.",
-    local: "On this computer", localHelp: "Free and private. Needs a download.", online: "Online, with a key", onlineHelp: "Uses a service you already pay for or a free one.",
+    local: "On this computer", localHelp: "Free and private. Needs a download.", online: "Online", onlineHelp: "Your Claude or ChatGPT subscription, or a service with a key.",
     noSuggestion: "Vatra couldn't load suggestions. You can pick a model later in Settings, then Models.",
     downloading: "Downloading {name}…",
     stepTools: "Connect your tools",

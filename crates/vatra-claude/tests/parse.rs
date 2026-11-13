@@ -41,6 +41,16 @@ fn result_error_is_failed() {
 }
 
 #[test]
+fn a_lapsed_sign_in_says_how_to_sign_in_again() {
+    let parsed = parse_line(
+        r#"{"type":"result","is_error":true,"result":"Failed to authenticate: OAuth session expired and could not be refreshed"}"#,
+    );
+    let message = parsed.iter().find_map(|item| match item { Parsed::Failed(message) => Some(message.clone()), _ => None }).unwrap();
+    assert!(message.starts_with("Failed to authenticate"), "{message}");
+    assert!(message.contains("/login"), "{message}");
+}
+
+#[test]
 fn tool_result_with_plain_string_content_and_error_flag_maps() {
     let line = r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t9","content":"eroare","is_error":true}]}}"#;
     assert_eq!(parse_line(line), vec![Parsed::Event(Event::ToolResult {
