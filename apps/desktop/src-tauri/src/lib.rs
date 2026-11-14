@@ -187,7 +187,7 @@ pub fn run() {
 }
 
 /// The updater verifies the downloaded artifact signature before running its installer.
-/// Called only after the person confirms an available update in Settings.
+/// Called only after the person confirms an available update in Settings or the startup prompt.
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_updater::UpdaterExt;

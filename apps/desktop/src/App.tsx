@@ -23,6 +23,7 @@ import {updateFiles,useFiles} from "./files/store";
 import {fileCopy} from "./files/copy";
 import "./files/files.css";
 import {flushConversationState,hasUnsavedConversationState} from "./files/persistence";
+import { StartupUpdatePrompt } from "./components/StartupUpdatePrompt";
 
 function ExpandButton({ waiting, onClick }: { waiting: number; onClick: () => void }) {
   const label = waiting > 0 ? copy.expandSidebarWaiting(waiting) : copy.expandSidebar;
@@ -64,12 +65,15 @@ export function App() {
   const agents = useAppStore((state) => state.agents);
   const setupRequested = useAppStore((state) => state.setupRequested);
   const [setup, setSetup] = useState<{ sources: boolean } | null>(null);
+  const [setupChecking, setSetupChecking] = useState(true);
   useEffect(() => {
-    if (!setupRequested && (!agentsLoaded || agents.length > 0)) return;
+    if (!setupRequested && !agentsLoaded) return;
+    if (!setupRequested && agents.length > 0) { setSetupChecking(false); return; }
+    setSetupChecking(true);
     let live = true;
     client.call<{ done: boolean; sources: boolean }>("onboarding.state", {}).then((state) => {
       if (live && (setupRequested || state.done === false)) setSetup({ sources: state.sources });
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => { if (live) setSetupChecking(false); });
     return () => { live = false; };
   }, [client, agentsLoaded, agents.length, setupRequested]);
 
@@ -202,6 +206,7 @@ export function App() {
       ) : null}
       {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} /> : null}
       <ToastHost />
+      <StartupUpdatePrompt suspended={setupChecking || setupRequested || !!setup || settingsOpen || !!settingsPage || paletteOpen} />
       {setup ? <Onboarding sources={setup.sources} onDone={() => { setSetup(null); useAppStore.setState({ setupRequested: false }); }} /> : null}
     </div>
   );

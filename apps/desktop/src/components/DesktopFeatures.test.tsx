@@ -7,6 +7,7 @@ import { FakeService } from "../rpc/fake";
 import { initialState, useAppStore } from "../state/store";
 import { ModelsPage } from "./ModelsPage";
 import { UpdateStatus } from "./UpdateStatus";
+import { initialUpdateState, useUpdates } from "../updates";
 
 const mocks = vi.hoisted(() => ({ desktop: true, invoke: vi.fn(), open: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => mocks.desktop, invoke: mocks.invoke }));
@@ -14,6 +15,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: mocks.open }));
 let service: FakeService;
 beforeEach(() => {
   setLanguage("en"); mocks.desktop = true; mocks.invoke.mockReset(); mocks.open.mockReset();
+  useUpdates.setState(initialUpdateState());
   useAppStore.setState(initialState()); service = new FakeService(); service.open();
   Object.assign(service.results, { "models.installed": [], "models.labels": [], "hardware.get": { cpu: {}, ram: { total: 0, available: 0 }, gpus: [] }, "llama.status": { installed: true, install: { build: 1, caps: {} } } });
 });

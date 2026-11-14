@@ -53,6 +53,8 @@ The installer is not signed with Authenticode. Windows may show a SmartScreen wa
 
 ## Update configuration and signing
 
+The desktop checks for updates once when its interface starts. A newer version opens an in-app **Install update / Later** prompt after onboarding or Settings closes. **Later** dismisses that version for the current launch; showing a window that was hidden in the tray does not repeat the startup check. Startup network errors and unconfigured endpoints stay quiet, and Settings retains a manual check with error details. Downloads and installation begin only after explicit confirmation, and the native updater verifies the artifact signature before installation.
+
 The desktop registers `tauri-plugin-updater`. Its `update_status` command checks availability and reports an empty endpoint list as unconfigured. After user confirmation, `install_update` checks again and calls `download_and_install`, which verifies the artifact signature before installing. Checking an update manifest alone does not prove that its artifact has been verified. The offline `update_signature` tests cover the minisign verification primitive with a public test vector and reject changed payload, signature and trusted-comment bytes; they do not exercise a live endpoint or an installer.
 
 - **Private key:** GitHub Actions uses the `TAURI_SIGNING_PRIVATE_KEY` secret. Local builds fall back to `%USERPROFILE%\.vatra-release\updater.key`, outside this repository. Environment credentials take precedence over local files. Never print or commit key contents; verify that the key matches the public key before publishing.

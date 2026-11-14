@@ -3,6 +3,7 @@ import {workspaceRo} from "./workspace";
 import {pickerRo} from "./picker";
 
 export const ro: Strings = {
+  startupUpdate: { title: "Actualizare disponibilă", available: "Vatra {version} este gata de instalare.", later: "Mai târziu" },
   workspace:workspaceRo,
   ...pickerRo,
   updates: { check: "Caută actualizări", checking: "Se caută…", unconfigured: "Actualizările nu sunt configurate încă.", current: "Vatra este la zi.", available: "Actualizare disponibilă:" },

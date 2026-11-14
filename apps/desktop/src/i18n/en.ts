@@ -1,6 +1,7 @@
 import {workspaceEn} from "./workspace";
 import {pickerEn} from "./picker";
 export const en = {
+  startupUpdate: { title: "Update available", available: "Vatra {version} is ready to install.", later: "Later" },
   workspace:workspaceEn,
   ...pickerEn,
   updates: { check: "Check for updates", checking: "Checking…", unconfigured: "Updates aren't set up yet.", current: "Vatra is up to date.", available: "Update available:" },
