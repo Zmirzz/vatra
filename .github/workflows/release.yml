@@ -24,6 +24,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -45,7 +47,22 @@ jobs:
           }
           $releases = gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases" --jq '.[].tag_name'
           if ($LASTEXITCODE -ne 0) { throw 'Could not check existing releases' }
-          if (@($releases) -contains "v$version") { throw "Release v$version already exists. Bump the version or delete its unpublished draft first." }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and @($releases) -contains "v$version") { throw "Release v$version already exists; existing releases will not be overwritten." }
+
+      - name: Prepare release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            node scripts/release-version.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Automatic release version preparation failed' }
+          } else {
+            "tag=$env:GITHUB_REF_NAME" >> $env:GITHUB_OUTPUT
+            $sha = git rev-parse HEAD
+            if ($LASTEXITCODE -ne 0) { throw 'Could not determine release commit' }
+            "sha=$sha" >> $env:GITHUB_OUTPUT
+          }
 
       - name: Install frontend dependencies
         working-directory: apps/desktop
@@ -59,9 +76,10 @@ jobs:
           VATRA_GOOGLE_CLIENT_ID: ${{ secrets.VATRA_GOOGLE_CLIENT_ID }}
           VATRA_GOOGLE_CLIENT_SECRET: ${{ secrets.VATRA_GOOGLE_CLIENT_SECRET }}
           VATRA_MICROSOFT_CLIENT_ID: ${{ secrets.VATRA_MICROSOFT_CLIENT_ID }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ steps.version.outputs.sha }}
         run: |
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { '' }
-          ./scripts/release.ps1 -Draft -ExpectedTag $tag -Target $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY
+          ./scripts/release.ps1 -Draft -ExpectedTag $env:RELEASE_TAG -Target $env:RELEASE_SHA -Repository $env:GITHUB_REPOSITORY
 
       - name: Save installer and updater files
         uses: actions/upload-artifact@v4

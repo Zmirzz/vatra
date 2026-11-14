@@ -4,12 +4,16 @@
 
 The [Release workflow](https://github.com/Zmirzz/vatra/actions/workflows/release.yml) builds and signs the Windows x64 installer on a GitHub-hosted Windows runner. It creates a **draft** GitHub release containing the installer, its `.sig`, and the updater's `latest.json`.
 
-1. Set a new stable version in the workspace `Cargo.toml` and `apps/desktop/package.json`. Update their lockfiles too (`cargo metadata --no-deps --format-version 1` and `npm install --package-lock-only` from `apps/desktop`). Commit and push the changes.
-2. Open **Actions > Release > Run workflow**, select `main`, and run it. Alternatively, push a matching tag such as `v1.2.0`; tags must match the application version.
+1. Push the changes you want to release to `main`.
+2. Open **Actions > Release > Run workflow**, select `main`, and run it. GitHub automatically chooses the next patch version, synchronizes the Cargo/npm manifests and lockfiles, and pushes a version commit and matching tag before building. For example, `1.1.0` becomes `1.1.1`. Existing stable tags and releases, including drafts, are considered so versions are not reused.
 3. Wait for the workflow to finish. Download and check the installer from the draft release or the `vatra-windows-x64` workflow artifact.
 4. Open **Releases**, review the draft notes, and click **Publish release**. Existing installations can then discover the update through the configured endpoint.
 
-Your PC can be off after pushing the changes. The workflow always uses the selected commit, including when it creates the version tag. Drafts do not update `releases/latest`. Existing releases are never overwritten: use a new version, or delete an unpublished draft before rebuilding that version. Do not rerun a version that is already public.
+Your PC can be off after pushing the changes. Manual runs release the latest `main` plus the generated version commit; the tag, installer and updater manifest all use that same commit/version. Fetch/pull `main` before your next local change to pick up the generated version commit. Re-running a failed run reuses its annotated version tag and does not increment again, even if `main` has moved. A new **Run workflow** creates a new version. The version commit and tag are pushed atomically without force; branch rules must permit the GitHub Actions bot to push version commits to `main`. The built-in token's tag push does not trigger a duplicate workflow.
+
+For a manually chosen major/minor version, you can still update the workspace `Cargo.toml`, `apps/desktop/package.json` and their lockfiles, then push a matching tag such as `v2.0.0`. Tag-triggered runs use the exact tagged version and do not increment it.
+
+Drafts do not update `releases/latest`. Existing releases are never overwritten. If a run already created its draft, use that draft rather than re-running; to rebuild that same version, delete only the unpublished draft, keep its tag, and re-run the original run. Never delete a public release to rebuild it.
 
 The repository and releases can stay public. The private updater signing key belongs in an **encrypted Actions secret**, separate from repository files, and is not included in the installer or release assets. GitHub's build runner uses it to sign the installer; installed apps verify the signature using their existing public key. Automatic updates require keeping this private key somewhere trusted. This setup trusts GitHub Actions with it.
 
@@ -25,7 +29,7 @@ Configure repository **Settings > Secrets and variables > Actions** secrets once
 
 The built-in `GITHUB_TOKEN` publishes releases with `contents: write`; no personal access token is needed. The workflow requires the signing key before building. It runs only on manual dispatch or a version tag, never on pull requests. Only run it against trusted code, because building code has access to the release credentials. If supplied, OAuth values remain compiled into the app, as in the existing local release process. Without OAuth secrets, users must provide their own OAuth client configuration for Google/Microsoft sign-in; automatic updates still work.
 
-Run the isolated release-script checks with `powershell -ExecutionPolicy Bypass -File scripts/release.test.ps1`. These use fake build/publish commands and credentials, and do not establish that a hosted build or live update succeeded.
+Run version-selection, file synchronization and local Git retry checks with `node --test scripts/release-version.test.mjs`. Run the isolated build/publish checks with `powershell -ExecutionPolicy Bypass -File scripts/release.test.ps1`. They do not establish that a hosted build or live update succeeded.
 
 ## Desktop executable and NSIS installer
 
