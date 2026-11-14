@@ -36,13 +36,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          VATRA_GOOGLE_CLIENT_ID: ${{ secrets.VATRA_GOOGLE_CLIENT_ID }}
-          VATRA_GOOGLE_CLIENT_SECRET: ${{ secrets.VATRA_GOOGLE_CLIENT_SECRET }}
-          VATRA_MICROSOFT_CLIENT_ID: ${{ secrets.VATRA_MICROSOFT_CLIENT_ID }}
         run: |
-          foreach ($name in @('TAURI_SIGNING_PRIVATE_KEY', 'VATRA_GOOGLE_CLIENT_ID', 'VATRA_GOOGLE_CLIENT_SECRET', 'VATRA_MICROSOFT_CLIENT_ID')) {
-            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing Actions secret: $name" }
-          }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Automatic updates require the TAURI_SIGNING_PRIVATE_KEY Actions secret. Store the existing key in repository Settings > Secrets and variables > Actions; never commit it.' }
           $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Release version must be a stable major.minor.patch version' }
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {

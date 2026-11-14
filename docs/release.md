@@ -11,17 +11,19 @@ The [Release workflow](https://github.com/Zmirzz/vatra/actions/workflows/release
 
 Your PC can be off after pushing the changes. The workflow always uses the selected commit, including when it creates the version tag. Drafts do not update `releases/latest`. Existing releases are never overwritten: use a new version, or delete an unpublished draft before rebuilding that version. Do not rerun a version that is already public.
 
-Configure these repository **Settings > Secrets and variables > Actions** secrets once:
+The repository and releases can stay public. The private updater signing key belongs in an **encrypted Actions secret**, separate from repository files, and is not included in the installer or release assets. GitHub's build runner uses it to sign the installer; installed apps verify the signature using their existing public key. Automatic updates require keeping this private key somewhere trusted. This setup trusts GitHub Actions with it.
+
+Configure repository **Settings > Secrets and variables > Actions** secrets once. Only the updater signing key is required; OAuth credentials are optional and unrelated to automatic updates:
 
 | Secret | Value |
 | --- | --- |
 | `TAURI_SIGNING_PRIVATE_KEY` | Contents of the existing updater private key; keep the key paired with the public key compiled into installed apps. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Key password, if applicable; otherwise leave unset. |
-| `VATRA_GOOGLE_CLIENT_ID` | Existing Google OAuth client ID. |
-| `VATRA_GOOGLE_CLIENT_SECRET` | Existing Google OAuth client secret. |
-| `VATRA_MICROSOFT_CLIENT_ID` | Existing Microsoft OAuth client ID. |
+| `VATRA_GOOGLE_CLIENT_ID` | Optional: existing Google OAuth client ID. |
+| `VATRA_GOOGLE_CLIENT_SECRET` | Optional: existing Google OAuth client secret. |
+| `VATRA_MICROSOFT_CLIENT_ID` | Optional: existing Microsoft OAuth client ID. |
 
-The built-in `GITHUB_TOKEN` publishes releases with `contents: write`; no personal access token is needed. The workflow requires the signing key and all three OAuth secrets before building. It runs only on manual dispatch or a version tag, never on pull requests. Only run it against trusted code, because building code has access to the release credentials. The OAuth values remain compiled into the app, as in the existing local release process.
+The built-in `GITHUB_TOKEN` publishes releases with `contents: write`; no personal access token is needed. The workflow requires the signing key before building. It runs only on manual dispatch or a version tag, never on pull requests. Only run it against trusted code, because building code has access to the release credentials. If supplied, OAuth values remain compiled into the app, as in the existing local release process. Without OAuth secrets, users must provide their own OAuth client configuration for Google/Microsoft sign-in; automatic updates still work.
 
 Run the isolated release-script checks with `powershell -ExecutionPolicy Bypass -File scripts/release.test.ps1`. These use fake build/publish commands and credentials, and do not establish that a hosted build or live update succeeded.
 
