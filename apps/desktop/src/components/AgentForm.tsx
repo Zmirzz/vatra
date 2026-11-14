@@ -84,7 +84,9 @@ export function AgentForm({ onSaved, onCancel, kinds = ["model", "claude", "acp"
     catch (caught) { setError((caught as Error).message); }
     finally { setBusy(false); }
   };
-  const ready = kind === "model" ? Boolean(model.trim() && (chosen?.baseUrl || chosen?.driver === "anthropic" || baseUrl.trim())) : Boolean(form());
+  // A hosted service answers 401 to every request without a key, so a new agent for one needs it before saving.
+  const keyMissing = Boolean(chosen?.keyUrl) && initial?.kind !== "model" && !key.trim();
+  const ready = kind === "model" ? Boolean(model.trim() && (chosen?.baseUrl || chosen?.driver === "anthropic" || baseUrl.trim()) && !keyMissing) : Boolean(form());
   const picked = models.find((item) => item.id === model);
 
   return <form className="agent-form" onSubmit={(event) => { event.preventDefault(); void submit(); }}>

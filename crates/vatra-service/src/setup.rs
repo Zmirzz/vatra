@@ -224,16 +224,32 @@ pub fn check_save(
         return Err(format!("`{}` is set in vatra.toml. Edit it there, or choose another name.", row.name));
     }
     let existing = store.configured_agents().map_err(|error| error.to_string())?.into_iter().find(|old| old.name == row.name);
-    let Some(old) = existing else { return Ok(()) };
     let place = |json: &str| {
         let settings: Value = serde_json::from_str(json).unwrap_or(Value::Null);
         (settings["base_url"].clone(), settings["driver"].clone())
     };
     let has_key = secrets.get(&agent_secret(&row.name)).ok().flatten().is_some();
+    // A hosted service answers every request without a key with 401, so such an agent could never answer.
+    let keeps_key = has_key && existing.as_ref().is_some_and(|old| place(&old.settings_json) == place(&row.settings_json));
+    if row.kind == "model" && key.is_none() && !keeps_key && needs_key(&row.settings_json) {
+        return Err("Enter the service's key. To use a Claude or ChatGPT subscription instead, add Claude Code or Codex.".into());
+    }
+    let Some(old) = existing else { return Ok(()) };
     if key.is_none() && has_key && place(&old.settings_json) != place(&row.settings_json) {
         return Err("The service address changed, so enter the key again. The saved key isn't sent to a new address.".into());
     }
     Ok(())
+}
+
+/// Whether the agent's service is one of the hosted ones that hands out keys. Servers the person runs, and other
+/// addresses, may need no key.
+fn needs_key(settings_json: &str) -> bool {
+    let settings: Value = serde_json::from_str(settings_json).unwrap_or(Value::Null);
+    let base_url = settings["base_url"].as_str();
+    let driver = settings["driver"].as_str();
+    PROVIDERS.iter().filter(|provider| provider.key_url.is_some()).any(|provider| {
+        Some(provider.driver) == driver && provider.base_url == base_url
+    })
 }
 
 /// Saves the agent and its key. A key that isn't given keeps the one saved before.

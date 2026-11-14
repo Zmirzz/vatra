@@ -119,11 +119,25 @@ fn parse_result(value: &Value, line: &str) -> Vec<Parsed> {
     };
     parsed.push(if value["is_error"].as_bool().unwrap_or(false) {
         let message = value["result"].as_str().unwrap_or("Claude Code reported an error");
-        Parsed::Failed(message.into())
+        Parsed::Failed(with_login_hint(message))
     } else {
         Parsed::Completed
     });
     parsed
+}
+
+/// Claude Code keeps its own sign-in, which Vatra can't renew. When it has lapsed, say where to sign in again.
+fn with_login_hint(message: &str) -> String {
+    let lower = message.to_lowercase();
+    let signed_out = lower.contains("failed to authenticate")
+        || lower.contains("oauth")
+        || lower.contains("invalid api key")
+        || lower.contains("please run /login");
+    if signed_out {
+        format!("{message}. Claude Code's sign-in has lapsed: open a terminal, run `claude` and type /login, then try again.")
+    } else {
+        message.to_string()
+    }
 }
 
 /// Lines from a subagent carry `parent_tool_use_id`, which ties them to the `Agent` call.

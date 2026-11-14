@@ -20,6 +20,8 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(600);
 const MAX_TOKENS: u64 = 16_000;
 const DEFAULT_CONTEXT_WINDOW: u64 = 200_000;
 const EXCERPT_CHARS: usize = 500;
+const NO_KEY: &str = "this agent has no Anthropic API key. Add one in Settings, Agents, or use the Claude Code agent to \
+     chat with a Claude subscription.";
 const EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
 
 pub struct AnthropicDriver {
@@ -66,6 +68,11 @@ impl ModelDriver for AnthropicDriver {
         request: &ModelRequest,
         on_text: &mut (dyn for<'a> FnMut(&'a str) + Send),
     ) -> Result<Completion, ModelError> {
+        // Without a key Anthropic only answers "x-api-key header is required", which says nothing about the fix.
+        // A proxy at another address may add its own credentials, so only Anthropic's own address is refused here.
+        if self.config.api_key.is_none() && self.base_url() == DEFAULT_BASE_URL {
+            return Err(ModelError::Other(NO_KEY.into()));
+        }
         let url = format!("{}/v1/messages", self.base_url());
         let mut builder = self.http.post(url).header("anthropic-version", API_VERSION).json(&self.body(request));
         if let Some(key) = &self.config.api_key {

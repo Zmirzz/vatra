@@ -1530,7 +1530,20 @@ impl AgentFactory for ConfigAgents {
         {
             return Arc::new(LocalSummarizer { models: Arc::clone(models), name: self.config.summarizer.clone() });
         }
-        match self.model_driver(&self.config.summarizer) {
+        // With none chosen, the first model agent writes summaries, so a handoff doesn't fail on an empty name.
+        let name = if self.config.summarizer.is_empty() {
+            match self.config.agents.iter().find(|(_, agent)| matches!(agent, AgentConfig::Model { .. })) {
+                Some((name, _)) => name.clone(),
+                None => {
+                    return Arc::new(UnavailableSummarizer(
+                        "no model is chosen for summaries. Choose one in Settings, Agents.".into(),
+                    ));
+                }
+            }
+        } else {
+            self.config.summarizer.clone()
+        };
+        match self.model_driver(&name) {
             Ok(driver) => Arc::new(OpenAiSummarizer::new(driver)),
             Err(message) => {
                 eprintln!("warning: automatic summaries aren't available: {message}");

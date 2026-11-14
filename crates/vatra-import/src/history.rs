@@ -263,12 +263,16 @@ pub fn history_key(cwd: &str) -> String {
 
 /// How many lines of a log are read to learn its folder and start. Both come early in a log.
 const PEEK_LINES: usize = 200;
+/// How many bytes of a log are read at most to learn the same.
+const PEEK_BYTES: u64 = 1024 * 1024;
 
 /// The folder and the start of a conversation, from the first lines of its log only.
 fn peek_log(path: &Path, origin: &str) -> Option<ParsedLog> {
     let file = GuardedFs::new().open(path).ok()?;
     let mut meta = ParsedLog::default();
-    for value in JsonLines::new(BufReader::new(file)).take(PEEK_LINES) {
+    // Lines carry pasted images and tool output, so 200 of them can be hundreds of megabytes. Over thousands of logs
+    // that made the list of folders take minutes; the bytes read per log are capped as well as the lines.
+    for value in JsonLines::new(BufReader::new(io::Read::take(file, PEEK_BYTES))).take(PEEK_LINES) {
         if let Ok(Some(value)) = value {
             let _ = line(&value, origin, &mut meta);
         }
