@@ -1,5 +1,30 @@
 # Building and releasing Vatra on Windows
 
+## Release from GitHub (no local build)
+
+The [Release workflow](https://github.com/Zmirzz/vatra/actions/workflows/release.yml) builds and signs the Windows x64 installer on a GitHub-hosted Windows runner. It creates a **draft** GitHub release containing the installer, its `.sig`, and the updater's `latest.json`.
+
+1. Set a new stable version in the workspace `Cargo.toml` and `apps/desktop/package.json`. Update their lockfiles too (`cargo metadata --no-deps --format-version 1` and `npm install --package-lock-only` from `apps/desktop`). Commit and push the changes.
+2. Open **Actions > Release > Run workflow**, select `main`, and run it. Alternatively, push a matching tag such as `v1.2.0`; tags must match the application version.
+3. Wait for the workflow to finish. Download and check the installer from the draft release or the `vatra-windows-x64` workflow artifact.
+4. Open **Releases**, review the draft notes, and click **Publish release**. Existing installations can then discover the update through the configured endpoint.
+
+Your PC can be off after pushing the changes. The workflow always uses the selected commit, including when it creates the version tag. Drafts do not update `releases/latest`. Existing releases are never overwritten: use a new version, or delete an unpublished draft before rebuilding that version. Do not rerun a version that is already public.
+
+Configure these repository **Settings > Secrets and variables > Actions** secrets once:
+
+| Secret | Value |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of the existing updater private key; keep the key paired with the public key compiled into installed apps. |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Key password, if applicable; otherwise leave unset. |
+| `VATRA_GOOGLE_CLIENT_ID` | Existing Google OAuth client ID. |
+| `VATRA_GOOGLE_CLIENT_SECRET` | Existing Google OAuth client secret. |
+| `VATRA_MICROSOFT_CLIENT_ID` | Existing Microsoft OAuth client ID. |
+
+The built-in `GITHUB_TOKEN` publishes releases with `contents: write`; no personal access token is needed. The workflow requires the signing key and all three OAuth secrets before building. It runs only on manual dispatch or a version tag, never on pull requests. Only run it against trusted code, because building code has access to the release credentials. The OAuth values remain compiled into the app, as in the existing local release process.
+
+Run the isolated release-script checks with `powershell -ExecutionPolicy Bypass -File scripts/release.test.ps1`. These use fake build/publish commands and credentials, and do not establish that a hosted build or live update succeeded.
+
 ## Desktop executable and NSIS installer
 
 From `apps/desktop`:
@@ -24,7 +49,7 @@ The installer is not signed with Authenticode. Windows may show a SmartScreen wa
 
 The desktop registers `tauri-plugin-updater`. Its `update_status` command checks availability and reports an empty endpoint list as unconfigured. After user confirmation, `install_update` checks again and calls `download_and_install`, which verifies the artifact signature before installing. Checking an update manifest alone does not prove that its artifact has been verified. The offline `update_signature` tests cover the minisign verification primitive with a public test vector and reject changed payload, signature and trusted-comment bytes; they do not exercise a live endpoint or an installer.
 
-- **Private key:** the configured release workflow expects `%USERPROFILE%\.vatra-release\updater.key`, outside this repository. Never print or commit its contents. This document does not establish that the key exists or matches the public key; verify that locally before publishing.
+- **Private key:** GitHub Actions uses the `TAURI_SIGNING_PRIVATE_KEY` secret. Local builds fall back to `%USERPROFILE%\.vatra-release\updater.key`, outside this repository. Environment credentials take precedence over local files. Never print or commit key contents; verify that the key matches the public key before publishing.
 - **Public key:** `apps/desktop/src-tauri/tauri.conf.json`, `plugins.updater.pubkey`.
 - **Endpoint:** `https://github.com/Zmirzz/vatra/releases/latest/download/latest.json`. Updates are served from GitHub Releases; `scripts/release.ps1` builds with the signing key (read into the environment, never printed), writes `latest.json` and creates the release with `gh`.
 - **Backup:** protect a backup of the private key. Losing it prevents the existing public key from accepting future artifacts signed with a replacement key; plan a manual reinstall or a migration while the old key is still available.

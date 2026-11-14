@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build signed Windows release
+    if: github.repository == 'Zmirzz/vatra'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check release secrets and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          VATRA_GOOGLE_CLIENT_ID: ${{ secrets.VATRA_GOOGLE_CLIENT_ID }}
+          VATRA_GOOGLE_CLIENT_SECRET: ${{ secrets.VATRA_GOOGLE_CLIENT_SECRET }}
+          VATRA_MICROSOFT_CLIENT_ID: ${{ secrets.VATRA_MICROSOFT_CLIENT_ID }}
+        run: |
+          foreach ($name in @('TAURI_SIGNING_PRIVATE_KEY', 'VATRA_GOOGLE_CLIENT_ID', 'VATRA_GOOGLE_CLIENT_SECRET', 'VATRA_MICROSOFT_CLIENT_ID')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing Actions secret: $name" }
+          }
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Release version must be a stable major.minor.patch version' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag must match application version v$version"
+          }
+          $releases = gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases" --jq '.[].tag_name'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not check existing releases' }
+          if (@($releases) -contains "v$version") { throw "Release v$version already exists. Bump the version or delete its unpublished draft first." }
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build, sign, and create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VATRA_GOOGLE_CLIENT_ID: ${{ secrets.VATRA_GOOGLE_CLIENT_ID }}
+          VATRA_GOOGLE_CLIENT_SECRET: ${{ secrets.VATRA_GOOGLE_CLIENT_SECRET }}
+          VATRA_MICROSOFT_CLIENT_ID: ${{ secrets.VATRA_MICROSOFT_CLIENT_ID }}
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { '' }
+          ./scripts/release.ps1 -Draft -ExpectedTag $tag -Target $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY
+
+      - name: Save installer and updater files
+        uses: actions/upload-artifact@v4
+        with:
+          name: vatra-windows-x64
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/*.sig
+            target/release/bundle/nsis/latest.json
+          if-no-files-found: error
